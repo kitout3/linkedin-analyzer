@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyseur LinkedIn - ADN de Marque</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+
+    <script>
+        // State management
+        let state = {
+            employees: [],
+            brandDNA: [
+                {id:1, name:"Innovation", weight:25, keywords:["innovation","créatif","nouveauté","technologie","digital","innovant","transformation"]},
+                {id:2, name:"Expertise", weight:25, keywords:["expert","spécialiste","compétence","expérience","maîtrise","expertise","professionnel"]},
+                {id:3, name:"Proximité", weight:25, keywords:["client","écoute","accompagnement","collaboration","partenariat","équipe","relationnel"]},
+                {id:4, name:"RSE", weight:25, keywords:["durable","responsable","environnement","social","éthique","impact","durabilité"]}
+            ],
+            departments: [
+                {id:1, name:"Sales", keywords:["vente","commercial","négociation","client","chiffre","business","développement"]},
+                {id:2, name:"Tech", keywords:["développement","code","programmation","architecture","agile","technique","software"]},
+                {id:3, name:"Marketing", keywords:["stratégie","communication","marque","campagne","contenu","digital","marketing"]}
+            ],
+            targetCompany: '',
+            currentView: 'list',
+            selectedEmployee: null
+        };
+
+        // Load from localStorage
+        function loadState() {
+            try {
+                const saved = localStorage.getItem('employees');
+                if (saved) state.employees = JSON.parse(saved);
+                
+                const savedDNA = localStorage.getItem('brandDNA');
+                if (savedDNA) state.brandDNA = JSON.parse(savedDNA);
+                
+                const savedDepts = localStorage.getItem('departments');
+                if (savedDepts) state.departments = JSON.parse(savedDepts);
+                
+                const savedCompany = localStorage.getItem('targetCompany');
+                if (savedCompany) state.targetCompany = savedCompany;
+            } catch (e) {
+                console.error('Error loading state:', e);
+            }
+        }
+
+        // Save state
+        function saveState() {
+            localStorage.setItem('employees', JSON.stringify(state.employees));
+            localStorage.setItem('brandDNA', JSON.stringify(state.brandDNA));
+            localStorage.setItem('departments', JSON.stringify(state.departments));
+            localStorage.setItem('targetCompany', state.targetCompany);
+        }
+
+        // Text processing
+        function processText(text) {
+            return text.toLowerCase()
+                .replace(/[^\w\sàâäéèêëïîôùûüÿæœç]/gi, ' ')
+                .split(/\s+/)
+                .filter(word => word.length > 2);
+        }
+
+        // Extract profile info
+        function extractProfileInfo(text) {
+            const lines = text.split('\n').filter(l => l.trim());
+            let firstName = '', lastName = '', position = '', company = '';
+
+            const nameLine = lines[0] || '';
+            const nameMatch = nameLine.match(/^([A-ZÀ-ÿ][a-zà-ÿ]+)\s+([A-ZÀ-ÿ][a-zà-ÿ]+)/);
+            if (nameMatch) {
+                firstName = nameMatch[1];
+                lastName = nameMatch[2];
+            }
+
+            const positionKeywords = ['manager', 'director', 'ceo', 'cto', 'developer', 'engineer', 'consultant', 'analyst', 'specialist', 'coordinator', 'lead', 'head', 'chef', 'responsable', 'directeur'];
+            for (const line of lines) {
+                const lowerLine = line.toLowerCase();
+                if (positionKeywords.some(keyword => lowerLine.includes(keyword))) {
+                    position = line.trim();
+                    break;
+                }
+            }
+
+            for (const line of lines) {
+                if (line.toLowerCase().includes('chez ') || line.toLowerCase().includes(' at ')) {
+                    company = line.replace(/chez |at /gi, '').trim();
+                    break;
+                }
+            }
+
+            return { firstName, lastName, position, company };
+        }
+
+        // Analyze profile
+        function analyzeProfile(profileText) {
+            const words = processText(profileText);
+            const wordCount = words.length;
+            
+            const axisScores = state.brandDNA.map(axis => {
+                const foundKeywords = axis.keywords.filter(keyword => 
+                    words.some(word => word.includes(keyword.toLowerCase()) || keyword.toLowerCase().includes(word))
+                );
+                const rawScore = (foundKeywords.length / axis.keywords.length) * 100;
+                return {
+                    axisId: axis.id,
+                    axisName: axis.name,
+                    score: Math.round(rawScore),
+                    foundKeywords: foundKeywords,
+                    missingKeywords: axis.keywords.filter(k => !foundKeywords.includes(k))
+                };
+            });
+
+            const totalWeight = state.brandDNA.reduce((sum, axis) => sum + axis.weight, 0);
+            const globalScore = Math.round(
+                axisScores.reduce((sum, score) => {
+                    const axis = state.brandDNA.find(a => a.id === score.axisId);
+                    return sum + (score.score * axis.weight / totalWeight);
+                }, 0)
+            );
+
+            return {
+                globalScore: globalScore,
+                axisScores: axisScores,
+                wordCount: wordCount,
+                analyzedAt: new Date().toISOString()
+            };
+        }
+
+        // Calculate department score
+        function calculateDeptScore(profileText, deptName) {
+            const dept = state.departments.find(d => d.name === deptName);
+            if (!dept) return 0;
+            
+            const words = processText(profileText);
+            const foundKeywords = dept.keywords.filter(keyword => 
+                words.some(word => word.includes(keyword.toLowerCase()) || keyword.toLowerCase().includes(word))
+            );
+            return Math.round((foundKeywords.length / dept.keywords.length) * 100);
+        }
+
+        // Quick add from clipboard
+        function quickAdd() {
+            const text = prompt('📋 Collez le contenu du profil LinkedIn ici (Ctrl+V / Cmd+V) :');
+            
+            if (!text || text.length < 50) {
+                alert('❌ Le texte est vide ou trop court. Veuillez copier le profil complet depuis LinkedIn.');
+                return;
+            }
+
+            const extracted = extractProfileInfo(text);
+            const analysis = analyzeProfile(text);
+            
+            let autoDept = '';
+            let maxScore = 0;
+            state.departments.forEach(dept => {
+                const score = calculateDeptScore(text, dept.name);
+                if (score > maxScore) {
+                    maxScore = score;
+                    autoDept = dept.name;
+                }
+            });
+
+            const newEmployee = {
+                id: Date.now(),
+                firstName: extracted.firstName || 'Prénom',
+                lastName: extracted.lastName || 'Nom',
+                position: extracted.position || 'Poste',
+                department: autoDept,
+                company: extracted.company || state.targetCompany,
+                linkedinUrl: '',
+                profileText: text,
+                globalScore: analysis.globalScore,
+                axisScores: analysis.axisScores,
+                wordCount: analysis.wordCount,
+                analyzedAt: analysis.analyzedAt,
+                deptScore: calculateDeptScore(text, autoDept),
+                createdAt: new Date().toISOString()
+            };
+
+            state.employees.push(newEmployee);
+            saveState();
+            render();
+            alert('✅ Profil ajouté : ' + newEmployee.firstName + ' ' + newEmployee.lastName + '\n📊 Score ADN : ' + newEmployee.globalScore + '/100');
+        }
+
+        // Delete employee
+        function deleteEmployee(id) {
+            if (confirm('Supprimer ce collaborateur ?')) {
+                state.employees = state.employees.filter(emp => emp.id !== id);
+                saveState();
+                render();
+            }
+        }
+
+        // View employee
+        function viewEmployee(id) {
+            state.selectedEmployee = state.employees.find(emp => emp.id === id);
+            state.currentView = 'detail';
+            render();
+        }
+
+        // Export data
+        function exportData() {
+            const data = {
+                employees: state.employees,
+                brandDNA: state.brandDNA,
+                departments: state.departments,
+                targetCompany: state.targetCompany
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'linkedin-analyzer-' + Date.now() + '.json';
+            a.click();
+        }
+
+        // Clear all data
+        function clearAllData() {
+            if (confirm('⚠️ Supprimer TOUTES les données ? Cette action est irréversible.')) {
+                state.employees = [];
+                saveState();
+                render();
+                alert('✅ Toutes les données ont été supprimées');
+            }
+        }
+
+        // Get score badge class
+        function getScoreBadge(score) {
+            if (score >= 70) return 'bg-green-100 text-green-800';
+            if (score >= 40) return 'bg-yellow-100 text-yellow-800';
+            return 'bg-red-100 text-red-800';
+        }
+
+        // Get score color
+        function getScoreColor(score) {
+            if (score >= 70) return 'text-green-600';
+            if (score >= 40) return 'text-yellow-600';
+            return 'text-red-600';
+        }
+
+        // Update company
+        function updateCompany(value) {
+            state.targetCompany = value;
+            saveState();
+        }
+
+        // Handle add employee form
+        function handleAddEmployee(event) {
+            event.preventDefault();
+            
+            const profileText = document.getElementById('profileText').value;
+            const analysis = analyzeProfile(profileText);
+            const department = document.getElementById('department').value;
+            
+            const newEmployee = {
+                id: Date.now(),
+                firstName: document.getElementById('firstName').value,
+                lastName: document.getElementById('lastName').value,
+                position: document.getElementById('position').value,
+                department: department,
+                company: document.getElementById('company').value,
+                linkedinUrl: '',
+                profileText: profileText,
+                globalScore: analysis.globalScore,
+                axisScores: analysis.axisScores,
+                wordCount: analysis.wordCount,
+                analyzedAt: analysis.analyzedAt,
+                deptScore: calculateDeptScore(profileText, department),
+                createdAt: new Date().toISOString()
+            };
+
+            state.employees.push(newEmployee);
+            saveState();
+            state.currentView = 'list';
+            render();
+            alert('✅ Profil ajouté avec succès !');
+        }
+
+        // Render functions
+        function renderHeader() {
+            return '<header class="bg-white shadow-sm border-b sticky top-0 z-10">' +
+                '<div class="max-w-7xl mx-auto px-4 py-4">' +
+                    '<div class="flex items-center justify-between">' +
+                        '<div>' +
+                            '<h1 class="text-2xl font-bold text-gray-900">Analyseur LinkedIn</h1>' +
+                            (state.targetCompany ? '<p class="text-sm text-gray-600 mt-1">Entreprise ciblée : ' + state.targetCompany + '</p>' : '') +
+                        '</div>' +
+                        '<div class="flex gap-2">' +
+                            '<button onclick="exportData()" class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="Exporter">📥</button>' +
+                            '<button onclick="clearAllData()" class="p-2 text-red-600 hover:bg-red-100 rounded-lg" title="Tout supprimer">🗑️</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</header>';
+        }
+
+        function renderEmployeeList() {
+            const avgScore = state.employees.length > 0 
+                ? Math.round(state.employees.reduce((sum, emp) => sum + emp.globalScore, 0) / state.employees.length)
+                : 0;
+
+            let html = '<div class="space-y-4">';
+            
+            // Company target
+            html += '<div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">' +
+                '<label class="block text-sm font-medium text-blue-900 mb-2">🎯 Entreprise ciblée (facultatif)</label>' +
+                '<input type="text" value="' + state.targetCompany + '" onchange="updateCompany(this.value)" placeholder="Ex: Google, Microsoft..." class="w-full px-4 py-2 border rounded-lg" />' +
+                '<p class="text-xs text-blue-700 mt-2">Cette information sera automatiquement ajoutée aux nouveaux profils</p>' +
+            '</div>';
+
+            // Stats
+            if (state.employees.length > 0) {
+                html += '<div class="grid grid-cols-3 gap-4">' +
+                    '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
+                        '<p class="text-3xl font-bold text-blue-600">' + state.employees.length + '</p>' +
+                        '<p class="text-sm text-gray-600">Profils</p>' +
+                    '</div>' +
+                    '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
+                        '<p class="text-3xl font-bold text-green-600">' + avgScore + '</p>' +
+                        '<p class="text-sm text-gray-600">Score ADN moyen</p>' +
+                    '</div>' +
+                    '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
+                        '<p class="text-3xl font-bold text-purple-600">' + state.employees.filter(e => e.globalScore >= 70).length + '</p>' +
+                        '<p class="text-sm text-gray-600">Profils alignés</p>' +
+                    '</div>' +
+                '</div>';
+            }
+
+            // Add buttons
+            html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">' +
+                '<button onclick="quickAdd()" class="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-lg">' +
+                    '<div class="font-bold">⚡ Coller rapidement</div>' +
+                    '<div class="text-xs opacity-90">Copier le profil LinkedIn, puis cliquer ici</div>' +
+                '</button>' +
+                '<button onclick="state.currentView = \'add\'; render();" class="bg-white border-2 border-gray-300 text-gray-700 py-4 rounded-lg hover:bg-gray-50">' +
+                    '<div class="font-bold">➕ Ajouter manuellement</div>' +
+                    '<div class="text-xs text-gray-600">Remplir le formulaire complet</div>' +
+                '</button>' +
+            '</div>';
+
+            // Employee list
+            html += '<div class="grid gap-4">';
+            state.employees.forEach(emp => {
+                html += '<div class="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">' +
+                    '<div class="flex items-start justify-between">' +
+                        '<div class="flex-1">' +
+                            '<h3 class="text-lg font-semibold text-gray-900">' + emp.firstName + ' ' + emp.lastName + '</h3>' +
+                            '<p class="text-gray-600">' + emp.position + '</p>' +
+                            '<div class="flex gap-2 mt-1">' +
+                                '<span class="text-sm text-gray-500">' + emp.department + '</span>' +
+                                (emp.company ? '<span class="text-gray-400">•</span><span class="text-sm text-gray-500">' + emp.company + '</span>' : '') +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="flex gap-2">' +
+                            '<div class="text-center">' +
+                                '<div class="px-3 py-1 rounded-full text-sm font-semibold ' + getScoreBadge(emp.globalScore) + '">' + emp.globalScore + '</div>' +
+                                '<p class="text-xs text-gray-500 mt-1">ADN</p>' +
+                            '</div>' +
+                            '<div class="text-center">' +
+                                '<div class="px-3 py-1 rounded-full text-sm font-semibold ' + getScoreBadge(emp.deptScore) + '">' + emp.deptScore + '</div>' +
+                                '<p class="text-xs text-gray-500 mt-1">Métier</p>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="flex gap-2 mt-4">' +
+                        '<button onclick="viewEmployee(' + emp.id + ')" class="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 text-sm font-medium">Voir la fiche</button>' +
+                        '<button onclick="deleteEmployee(' + emp.id + ')" class="px-3 py-2 text-red-600 hover:bg-red-50 rounded text-sm">🗑️</button>' +
+                    '</div>' +
+                '</div>';
+            });
+            html += '</div>';
+
+            // Empty state
+            if (state.employees.length === 0) {
+                html += '<div class="text-center py-12 bg-white rounded-lg">' +
+                    '<div class="text-6xl mb-4">📋</div>' +
+                    '<h3 class="text-lg font-semibold text-gray-900 mb-2">Aucun profil pour le moment</h3>' +
+                    '<p class="text-gray-600 mb-4">Commencez par copier un profil LinkedIn puis cliquez sur "Coller rapidement"</p>' +
+                    '<div class="text-sm text-gray-500 max-w-md mx-auto">' +
+                        '<p class="font-medium mb-2">💡 Comment faire ?</p>' +
+                        '<ol class="text-left space-y-2 bg-blue-50 p-4 rounded-lg">' +
+                            '<li>1️⃣ Ouvrez un profil LinkedIn dans votre navigateur</li>' +
+                            '<li>2️⃣ Sélectionnez tout le texte (Ctrl+A ou Cmd+A)</li>' +
+                            '<li>3️⃣ Copiez le texte (Ctrl+C ou Cmd+C)</li>' +
+                            '<li>4️⃣ Cliquez sur "⚡ Coller rapidement"</li>' +
+                            '<li>5️⃣ Collez dans la fenêtre qui s\'ouvre (Ctrl+V ou Cmd+V)</li>' +
+                        '</ol>' +
+                    '</div>' +
+                '</div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function renderEmployeeDetail() {
+            const emp = state.selectedEmployee;
+            if (!emp) return '';
+
+            const getSummary = () => {
+                if (emp.globalScore >= 70) return 'Ce profil est fortement aligné avec l\'ADN de la marque.';
+                if (emp.globalScore >= 40) return 'Ce profil est moyennement aligné avec l\'ADN de la marque.';
+                return 'Ce profil présente un faible alignement avec l\'ADN de la marque.';
+            };
+
+            const strongAxes = emp.axisScores.filter(axis => axis.score >= 60);
+            const weakAxes = emp.axisScores.filter(axis => axis.score < 50);
+
+            let html = '<div class="space-y-6">';
+            
+            html += '<button onclick="state.currentView = \'list\'; render();" class="text-blue-600 hover:text-blue-700 font-medium">← Retour à la liste</button>';
+
+            html += '<div class="bg-white p-6 rounded-lg shadow-sm">' +
+                '<h2 class="text-2xl font-bold text-gray-900">' + emp.firstName + ' ' + emp.lastName + '</h2>' +
+                '<p class="text-lg text-gray-600 mt-1">' + emp.position + '</p>' +
+                '<div class="flex gap-2 mt-2">' +
+                    '<span class="text-gray-500">' + emp.department + '</span>' +
+                    (emp.company ? '<span class="text-gray-400">•</span><span class="text-gray-500">' + emp.company + '</span>' : '') +
+                '</div>' +
+            '</div>';
+
+            html += '<div class="bg-white p-6 rounded-lg shadow-sm">' +
+                '<h3 class="text-lg font-semibold mb-4">🏆 Scores globaux</h3>' +
+                '<div class="grid grid-cols-2 gap-6">' +
+                    '<div>' +
+                        '<p class="text-sm text-gray-600 mb-2">Score ADN de marque</p>' +
+                        '<div class="flex items-baseline gap-2">' +
+                            '<span class="text-4xl font-bold ' + getScoreColor(emp.globalScore) + '">' + emp.globalScore + '</span>' +
+                            '<span class="text-gray-500">/100</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div>' +
+                        '<p class="text-sm text-gray-600 mb-2">Score métier</p>' +
+                        '<div class="flex items-baseline gap-2">' +
+                            '<span class="text-4xl font-bold ' + getScoreColor(emp.deptScore) + '">' + emp.deptScore + '</span>' +
+                            '<span class="text-gray-500">/100</span>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+
+            html += '<div class="bg-blue-50 p-6 rounded-lg border border-blue-200">' +
+                '<h3 class="text-lg font-semibold mb-2 text-blue-900">📊 Analyse synthétique</h3>' +
+                '<p class="text-blue-800">' + getSummary() + '</p>' +
+                '<p class="text-sm text-blue-700 mt-2">📝 Richesse du profil: ' + emp.wordCount + ' mots analysés</p>' +
+            '</div>';
+
+            html += '<div class="bg-white p-6 rounded-lg shadow-sm">' +
+                '<h3 class="text-lg font-semibold mb-4">📊 Scores par axe ADN</h3>' +
+                '<div class="space-y-4">';
+            
+            emp.axisScores.forEach(axis => {
+                const barColor = axis.score >= 70 ? 'bg-green-500' : axis.score >= 40 ? 'bg-yellow-500' : 'bg-red-500';
+                html += '<div>' +
+                    '<div class="flex items-center justify-between mb-2">' +
+                        '<span class="font-medium">' + axis.axisName + '</span>' +
+                        '<span class="font-semibold ' + getScoreColor(axis.score) + '">' + axis.score + '/100</span>' +
+                    '</div>' +
+                    '<div class="w-full bg-gray-200 rounded-full h-3">' +
+                        '<div class="h-3 rounded-full ' + barColor + '" style="width: ' + axis.score + '%"></div>' +
+                    '</div>';
+                
+                if (axis.foundKeywords.length > 0) {
+                    html += '<p class="text-sm text-gray-600 mt-1">✓ Mots-clés trouvés: <span class="text-green-700">' + axis.foundKeywords.join(', ') + '</span></p>';
+                }
+                
+                html += '</div>';
+            });
+            
+            html += '</div></div>';
+
+            if (strongAxes.length > 0) {
+                html += '<div class="bg-green-50 p-6 rounded-lg border border-green-200">' +
+                    '<h3 class="text-lg font-semibold mb-3 text-green-900">💪 Points forts</h3>' +
+                    '<div class="space-y-2">';
+                
+                strongAxes.forEach(axis => {
+                    html += '<div>' +
+                        '<p class="font-medium text-green-800">' + axis.axisName + '</p>' +
+                        '<p class="text-sm text-green-700">Mots-clés présents: ' + axis.foundKeywords.join(', ') + '</p>' +
+                    '</div>';
+                });
+                
+                html += '</div></div>';
+            }
+
+            if (weakAxes.length > 0) {
+                html += '<div class="bg-orange-50 p-6 rounded-lg border border-orange-200">' +
+                    '<h3 class="text-lg font-semibold mb-3 text-orange-900">🎯 Axes d\'amélioration</h3>' +
+                    '<div class="space-y-3">';
+                
+                weakAxes.forEach(axis => {
+                    html += '<div>' +
+                        '<p class="font-medium text-orange-800">' + axis.axisName + '</p>' +
+                        '<p class="text-sm text-orange-700">💡 Suggestions: <span class="font-medium">' + axis.missingKeywords.slice(0, 5).join(', ') + '</span></p>' +
+                    '</div>';
+                });
+                
+                html += '</div></div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function renderAddForm() {
+            let html = '<div class="bg-white p-6 rounded-lg shadow-sm max-w-3xl mx-auto">' +
+                '<h2 class="text-xl font-bold mb-4">➕ Ajouter un collaborateur</h2>' +
+                '<form onsubmit="handleAddEmployee(event); return false;" class="space-y-4">' +
+                    '<div class="grid grid-cols-2 gap-4">' +
+                        '<div>' +
+                            '<label class="block text-sm font-medium text-gray-700 mb-1">Prénom <span class="text-red-500">*</span></label>' +
+                            '<input type="text" id="firstName" required class="w-full px-3 py-2 border rounded-lg" />' +
+                        '</div>' +
+                        '<div>' +
+                            '<label class="block text-sm font-medium text-gray-700 mb-1">Nom <span class="text-red-500">*</span></label>' +
+                            '<input type="text" id="lastName" required class="w-full px-3 py-2 border rounded-lg" />' +
+                        '</div>' +
+                    '</div>' +
+                    '<div>' +
+                        '<label class="block text-sm font-medium text-gray-700 mb-1">Poste</label>' +
+                        '<input type="text" id="position" class="w-full px-3 py-2 border rounded-lg" />' +
+                    '</div>' +
+                    '<div class="grid grid-cols-2 gap-4">' +
+                        '<div>' +
+                            '<label class="block text-sm font-medium text-gray-700 mb-1">Service</label>' +
+                            '<select id="department" class="w-full px-3 py-2 border rounded-lg">' +
+                                '<option value="">Sélectionner</option>';
+            
+            state.departments.forEach(dept => {
+                html += '<option value="' + dept.name + '">' + dept.name + '</option>';
+            });
+            
+            html += '</select>' +
+                        '</div>' +
+                        '<div>' +
+                            '<label class="block text-sm font-medium text-gray-700 mb-1">Entreprise</label>' +
+                            '<input type="text" id="company" value="' + state.targetCompany + '" class="w-full px-3 py-2 border rounded-lg" />' +
+                        '</div>' +
+                    '</div>' +
+                    '<div>' +
+                        '<label class="block text-sm font-medium text-gray-700 mb-1">Profil LinkedIn (texte) <span class="text-red-500">*</span></label>' +
+                        '<textarea id="profileText" required class="w-full px-3 py-2 border rounded-lg h-48" placeholder="Collez ici le contenu du profil LinkedIn..."></textarea>' +
+                    '</div>' +
+                    '<div class="flex gap-2">' +
+                        '<button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium">✅ Ajouter et analyser</button>' +
+                        '<button type="button" onclick="state.currentView = \'list\'; render();" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 font-medium">❌ Annuler</button>' +
+                    '</div>' +
+                '</form>' +
+            '</div>';
+            
+            return html;
+        }
+
+        // Main render function
+        function render() {
+            const app = document.getElementById('app');
+            
+            let content = '';
+            if (state.currentView === 'list') {
+                content = renderEmployeeList();
+            } else if (state.currentView === 'detail') {
+                content = renderEmployeeDetail();
+            } else if (state.currentView === 'add') {
+                content = renderAddForm();
+            }
+
+            app.innerHTML = renderHeader() + '<main class="max-w-7xl mx-auto px-4 py-6">' + content + '</main>';
+        }
+
+        // Initial load and render
+        loadState();
+        render();
+    </script>
+</body>
+</html>
