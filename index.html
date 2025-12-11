@@ -128,6 +128,55 @@
 
             return { firstName, lastName, position, company };
         }
+function capitalizeWord(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+// Exemple d’URL :
+// https://www.linkedin.com/in/jean-dupont/
+// https://www.linkedin.com/in/dupont-jean-75001/
+// https://www.linkedin.com/in/jean-marie-dupont/
+function extractNameFromLinkedInUrl(url) {
+    const username = extractLinkedInUsername(url); // déjà existant
+    if (!username) return { firstName: '', lastName: '' };
+
+    // On nettoie le slug
+    let slug = decodeURIComponent(username)
+        .toLowerCase()
+        .replace(/\d+/g, '')        // supprime chiffres type -75001, -123, etc.
+        .replace(/_/g, '-')         // remplace _ par -
+        .replace(/\s+/g, '-');      // au cas où
+
+    const parts = slug.split('-').filter(Boolean);
+    if (parts.length === 0) {
+        return { firstName: '', lastName: '' };
+    }
+
+    // Cas simples :
+    // jean-dupont        -> jean / dupont
+    // jean-marie-dupont  -> jean marie / dupont
+    // dupont-jean        -> jean / dupont
+    let firstName = '';
+    let lastName = '';
+
+    if (parts.length === 1) {
+        // Impossible de savoir si c’est prénom ou nom, on met tout en prénom
+        firstName = capitalizeWord(parts[0]);
+        lastName = '';
+    } else if (parts.length === 2) {
+        // Heuristique : si le second ressemble plus à un nom => prenom + nom
+        firstName = capitalizeWord(parts[0]);
+        lastName = capitalizeWord(parts[1]);
+    } else {
+        // Plus de 2 segments : on prend tous les premiers comme prénom composé,
+        // le dernier comme nom de famille
+        firstName = parts.slice(0, parts.length - 1).map(capitalizeWord).join(' ');
+        lastName = capitalizeWord(parts[parts.length - 1]);
+    }
+
+    return { firstName, lastName };
+}
 
         // Analyze profile
         function analyzeProfile(profileText) {
@@ -297,62 +346,96 @@
         }
 
         // Quick add from clipboard
-        function quickAdd() {
-            const text = prompt('📋 Collez le contenu du profil LinkedIn ici (Ctrl+V / Cmd+V) :');
-            
-            if (!text || text.length < 50) {
-                alert('❌ Le texte est vide ou trop court. Veuillez copier le profil complet depuis LinkedIn.');
-                return;
-            }
+function quickAdd() {
+    const text = prompt('📋 Collez le contenu du profil LinkedIn ici (Ctrl+V / Cmd+V) :');
+    
+    if (!text || text.length < 50) {
+        alert('❌ Le texte est vide ou trop court. Veuillez copier le profil complet depuis LinkedIn.');
+        return;
+    }
 
-            const extracted = extractProfileInfo(text);
-            const analysis = analyzeProfile(text);
-            
-            let autoDept = '';
-            let maxScore = 0;
-            state.departments.forEach(dept => {
-                const deptAnalysis = calculateDeptScore(text, dept.name);
-                if (deptAnalysis.score > maxScore) {
-                    maxScore = deptAnalysis.score;
-                    autoDept = dept.name;
-                }
-            });
+    // Demande optionnelle de l’URL LinkedIn
+    const rawLinkedinUrl = prompt('🔗 Collez l’URL du profil LinkedIn (optionnel) :') || '';
+    let linkedinUrl = '';
 
-            const deptAnalysis = calculateDeptScore(text, autoDept);
-
-            const newEmployee = {
-                id: Date.now(),
-                firstName: extracted.firstName || 'Prénom',
-                lastName: extracted.lastName || 'Nom',
-                position: extracted.position || 'Poste',
-                department: autoDept,
-                company: extracted.company || state.targetCompany,
-                linkedinUrl: '',
-                profileText: text,
-                globalScore: analysis.globalScore,
-                axisScores: analysis.axisScores,
-                wordCount: analysis.wordCount,
-                analyzedAt: analysis.analyzedAt,
-                deptScore: deptAnalysis.score,
-                deptFoundKeywords: deptAnalysis.foundKeywords,
-                deptMissingKeywords: deptAnalysis.missingKeywords,
-                deptTotalKeywords: deptAnalysis.totalKeywords,
-                createdAt: new Date().toISOString()
-            };
-
-            // Calculate LinkedIn scores
-            const linkedinScores = calculateLinkedInScore(text, newEmployee);
-            Object.assign(newEmployee, linkedinScores);
-
-            // Calculate SSI scores
-            const ssiScores = calculateSSI(text, newEmployee);
-            Object.assign(newEmployee, ssiScores);
-
-            state.employees.push(newEmployee);
-            saveState();
-            render();
-            alert('✅ Profil ajouté : ' + newEmployee.firstName + ' ' + newEmployee.lastName + '\n\n📊 Score SSI : ' + newEmployee.ssiScore + '/100\n🔵 Score LinkedIn : ' + newEmployee.linkedinGlobalScore + '/100' + '\n🧬 Score ADN : ' + newEmployee.globalScore + '/100' + '\n💼 Score Métier : ' + newEmployee.deptScore + '/100');
+    if (rawLinkedinUrl.trim() !== '') {
+        if (!isValidLinkedInURL(rawLinkedinUrl.trim())) {
+            alert('⚠️ L’URL LinkedIn n’est pas au bon format.\nFormat attendu : https://www.linkedin.com/in/username/');
+            return;
         }
+        linkedinUrl = rawLinkedinUrl.trim();
+    }
+
+    const extracted = extractProfileInfo(text); // nom/prénom à partir du texte
+    const analysis = analyzeProfile(text);
+
+    // 🔹 NEW : si nom/prénom non trouvés dans le texte, on les prend depuis l’URL
+    let firstName = extracted.firstName;
+    let lastName = extracted.lastName;
+
+    if ((!firstName || !lastName) && linkedinUrl) {
+        const nameFromUrl = extractNameFromLinkedInUrl(linkedinUrl);
+        if (!firstName) firstName = nameFromUrl.firstName || 'Prénom';
+        if (!lastName)  lastName  = nameFromUrl.lastName  || 'Nom';
+    }
+
+    // Fallback si toujours vide
+    if (!firstName) firstName = 'Prénom';
+    if (!lastName)  lastName  = 'Nom';
+
+    let autoDept = '';
+    let maxScore = 0;
+    state.departments.forEach(dept => {
+        const deptAnalysis = calculateDeptScore(text, dept.name);
+        if (deptAnalysis.score > maxScore) {
+            maxScore = deptAnalysis.score;
+            autoDept = dept.name;
+        }
+    });
+
+    const deptAnalysis = calculateDeptScore(text, autoDept);
+
+    const newEmployee = {
+        id: Date.now(),
+        firstName: firstName,
+        lastName: lastName,
+        position: extracted.position || 'Poste',
+        department: autoDept,
+        company: extracted.company || state.targetCompany,
+        linkedinUrl: linkedinUrl,
+        profileText: text,
+        globalScore: analysis.globalScore,
+        axisScores: analysis.axisScores,
+        wordCount: analysis.wordCount,
+        analyzedAt: analysis.analyzedAt,
+        deptScore: deptAnalysis.score,
+        deptFoundKeywords: deptAnalysis.foundKeywords,
+        deptMissingKeywords: deptAnalysis.missingKeywords,
+        deptTotalKeywords: deptAnalysis.totalKeywords,
+        createdAt: new Date().toISOString()
+    };
+
+    // Scores LinkedIn
+    const linkedinScores = calculateLinkedInScore(text, newEmployee);
+    Object.assign(newEmployee, linkedinScores);
+
+    // Scores SSI
+    const ssiScores = calculateSSI(text, newEmployee);
+    Object.assign(newEmployee, ssiScores);
+
+    state.employees.push(newEmployee);
+    saveState();
+    render();
+
+    alert(
+        '✅ Profil ajouté : ' + newEmployee.firstName + ' ' + newEmployee.lastName +
+        '\n\n📊 Score SSI : ' + newEmployee.ssiScore + '/100' +
+        '\n🔵 Score LinkedIn : ' + newEmployee.linkedinGlobalScore + '/100' +
+        '\n🧬 Score ADN : ' + newEmployee.globalScore + '/100' +
+        '\n💼 Score Métier : ' + newEmployee.deptScore + '/100'
+    );
+}
+
 
         // Delete employee
         function deleteEmployee(id) {
