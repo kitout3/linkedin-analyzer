@@ -14,19 +14,41 @@
         let state = {
             employees: [],
             brandDNA: [
-                {id:1, name:"Innovation", weight:25, keywords:["innovation","créatif","nouveauté","technologie","digital","innovant","transformation"]},
-                {id:2, name:"Expertise", weight:25, keywords:["expert","spécialiste","compétence","expérience","maîtrise","expertise","professionnel"]},
-                {id:3, name:"Proximité", weight:25, keywords:["client","écoute","accompagnement","collaboration","partenariat","équipe","relationnel"]},
-                {id:4, name:"RSE", weight:25, keywords:["durable","responsable","environnement","social","éthique","impact","durabilité"]}
+                {
+                    id:1, 
+                    name:"Excellence patrimoniale & Expertise", 
+                    weight:30, 
+                    keywords:["patrimoine","patrimonial","patrimoniale","gestion","conseil","stratégie","stratégique","ingénierie","allocation","optimisation","expertise","expert","performance","financier","immobilier","investissement","transmission","excellence","accompagnement"]
+                },
+                {
+                    id:2, 
+                    name:"Indépendance & Intégrité", 
+                    weight:25, 
+                    keywords:["indépendance","indépendant","intégrité","transparence","transparent","confiance","éthique","responsable","capitalistique","partenaire","fiable","authentique"]
+                },
+                {
+                    id:3, 
+                    name:"Approche sur-mesure & Client", 
+                    weight:25, 
+                    keywords:["sur-mesure","personnalisé","personnalisation","client","dirigeant","entrepreneur","famille","accompagnement","écoute","solution","adapté","individuel","relation","proximité","orientation"]
+                },
+                {
+                    id:4, 
+                    name:"Vision long-terme & Durabilité", 
+                    weight:20, 
+                    keywords:["long-terme","pérenne","durable","durabilité","transmission","transmissible","impact","avenir","cohérent","vision","objectif","croissance","transformation","évolution"]
+                }
             ],
             departments: [
-                {id:1, name:"Sales", keywords:["vente","commercial","négociation","client","chiffre","business","développement"]},
-                {id:2, name:"Tech", keywords:["développement","code","programmation","architecture","agile","technique","software"]},
-                {id:3, name:"Marketing", keywords:["stratégie","communication","marque","campagne","contenu","digital","marketing"]}
+                {id:1, name:"Conseil Patrimonial", keywords:["conseil","patrimoine","stratégie","gestion","accompagnement","client","optimisation","transmission"]},
+                {id:2, name:"Gestion Financière", keywords:["finance","financier","investissement","allocation","performance","portefeuille","gestion","analyse"]},
+                {id:3, name:"Immobilier & Alternatifs", keywords:["immobilier","alternatif","investissement","placement","actif","diversification","rendement"]},
+                {id:4, name:"Direction & Management", keywords:["direction","management","stratégie","développement","leadership","équipe","vision","transformation"]}
             ],
-            targetCompany: '',
+            targetCompany: 'Cyrus Herez',
             currentView: 'list',
-            selectedEmployee: null
+            selectedEmployee: null,
+            companyMission: "Cyrus Herez accompagne les dirigeants, entrepreneurs et familles dans la construction, la sécurisation et la transmission de leur patrimoine grâce à une approche globale intégrant conseil stratégique, ingénierie patrimoniale, allocation financière, immobilier et investissements alternatifs."
         };
 
         // Load from localStorage
@@ -130,6 +152,61 @@
             };
         }
 
+        // Calculate LinkedIn Score
+        function calculateLinkedInScore(profileText, employee) {
+            const text = profileText.toLowerCase();
+            const words = processText(profileText);
+            const wordCount = words.length;
+            
+            // 1. Score de complétude (0-100)
+            let completudeScore = 0;
+            const sections = {
+                hasName: (employee.firstName && employee.lastName) ? 20 : 0,
+                hasPosition: employee.position ? 15 : 0,
+                hasCompany: employee.company ? 10 : 0,
+                hasRichContent: wordCount >= 200 ? 25 : (wordCount >= 100 ? 15 : wordCount >= 50 ? 10 : 0),
+                hasExperience: (text.includes('expérience') || text.includes('experience') || text.includes('depuis') || text.includes('années')) ? 15 : 0,
+                hasSkills: (text.includes('compétence') || text.includes('expertise') || text.includes('maîtrise') || text.includes('skills')) ? 15 : 0
+            };
+            completudeScore = Object.values(sections).reduce((a, b) => a + b, 0);
+            
+            // 2. Score de cohérence (0-100) - basé sur l'alignement ADN
+            const coherenceScore = employee.globalScore; // Utilise le score ADN existant
+            
+            // 3. Score de visibilité/SEO (0-100)
+            let visibilityScore = 0;
+            const seoKeywords = [
+                'patrimoine', 'gestion', 'conseil', 'stratégie', 'investissement',
+                'finance', 'immobilier', 'transmission', 'accompagnement', 'dirigeant',
+                'entrepreneur', 'famille', 'performance', 'optimisation', 'allocation'
+            ];
+            const foundSEOKeywords = seoKeywords.filter(kw => text.includes(kw));
+            visibilityScore = Math.min(100, (foundSEOKeywords.length / seoKeywords.length) * 100 + (wordCount >= 200 ? 20 : 0));
+            
+            // 4. Score d'engagement potentiel (0-100)
+            let engagementScore = 0;
+            const engagementIndicators = {
+                hasActionVerbs: /\b(accompagn|développ|conseill|aid|soutien|guid|optimis|transform|innov|créé|réalis|pilote)\w*/.test(text) ? 25 : 0,
+                hasNumbers: /\d+/.test(text) ? 20 : 0,
+                hasImpactWords: (text.includes('impact') || text.includes('résultat') || text.includes('succès') || text.includes('croissance') || text.includes('amélioration')) ? 25 : 0,
+                hasProfessionalTone: wordCount >= 150 ? 15 : (wordCount >= 80 ? 10 : 0),
+                hasClientFocus: (text.includes('client') || text.includes('partenaire') || text.includes('relation')) ? 15 : 0
+            };
+            engagementScore = Object.values(engagementIndicators).reduce((a, b) => a + b, 0);
+            
+            // Score LinkedIn global (moyenne des 4 scores)
+            const linkedinGlobalScore = Math.round((completudeScore + coherenceScore + visibilityScore + engagementScore) / 4);
+            
+            return {
+                linkedinGlobalScore,
+                completudeScore: Math.round(completudeScore),
+                coherenceScore: Math.round(coherenceScore),
+                visibilityScore: Math.round(visibilityScore),
+                engagementScore: Math.round(engagementScore),
+                foundSEOKeywords
+            };
+        }
+
         // Calculate department score
         function calculateDeptScore(profileText, deptName) {
             const dept = state.departments.find(d => d.name === deptName);
@@ -181,10 +258,14 @@
                 createdAt: new Date().toISOString()
             };
 
+            // Calculate LinkedIn scores
+            const linkedinScores = calculateLinkedInScore(text, newEmployee);
+            Object.assign(newEmployee, linkedinScores);
+
             state.employees.push(newEmployee);
             saveState();
             render();
-            alert('✅ Profil ajouté : ' + newEmployee.firstName + ' ' + newEmployee.lastName + '\n📊 Score ADN : ' + newEmployee.globalScore + '/100');
+            alert('✅ Profil ajouté : ' + newEmployee.firstName + ' ' + newEmployee.lastName + '\n📊 Score ADN : ' + newEmployee.globalScore + '/100' + '\n🔵 Score LinkedIn : ' + newEmployee.linkedinGlobalScore + '/100');
         }
 
         // Delete employee
@@ -274,6 +355,10 @@
                 createdAt: new Date().toISOString()
             };
 
+            // Calculate LinkedIn scores
+            const linkedinScores = calculateLinkedInScore(profileText, newEmployee);
+            Object.assign(newEmployee, linkedinScores);
+
             state.employees.push(newEmployee);
             saveState();
             state.currentView = 'list';
@@ -283,16 +368,16 @@
 
         // Render functions
         function renderHeader() {
-            return '<header class="bg-white shadow-sm border-b sticky top-0 z-10">' +
+            return '<header class="bg-gradient-to-r from-blue-900 to-blue-800 shadow-lg border-b">' +
                 '<div class="max-w-7xl mx-auto px-4 py-4">' +
                     '<div class="flex items-center justify-between">' +
                         '<div>' +
-                            '<h1 class="text-2xl font-bold text-gray-900">Analyseur LinkedIn</h1>' +
-                            (state.targetCompany ? '<p class="text-sm text-gray-600 mt-1">Entreprise ciblée : ' + state.targetCompany + '</p>' : '') +
+                            '<h1 class="text-2xl font-bold text-white">Analyseur LinkedIn - Cyrus Herez</h1>' +
+                            '<p class="text-sm text-blue-100 mt-1">Alignement des profils avec l\'ADN de l\'entreprise</p>' +
                         '</div>' +
                         '<div class="flex gap-2">' +
-                            '<button onclick="exportData()" class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="Exporter">📥</button>' +
-                            '<button onclick="clearAllData()" class="p-2 text-red-600 hover:bg-red-100 rounded-lg" title="Tout supprimer">🗑️</button>' +
+                            '<button onclick="exportData()" class="p-2 text-white hover:bg-blue-700 rounded-lg" title="Exporter">📥</button>' +
+                            '<button onclick="clearAllData()" class="p-2 text-white hover:bg-red-700 rounded-lg" title="Tout supprimer">🗑️</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +
@@ -303,30 +388,48 @@
             const avgScore = state.employees.length > 0 
                 ? Math.round(state.employees.reduce((sum, emp) => sum + emp.globalScore, 0) / state.employees.length)
                 : 0;
+            const avgLinkedInScore = state.employees.length > 0 
+                ? Math.round(state.employees.reduce((sum, emp) => sum + (emp.linkedinGlobalScore || 0), 0) / state.employees.length)
+                : 0;
 
             let html = '<div class="space-y-4">';
             
             // Company target
             html += '<div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">' +
-                '<label class="block text-sm font-medium text-blue-900 mb-2">🎯 Entreprise ciblée (facultatif)</label>' +
-                '<input type="text" value="' + state.targetCompany + '" onchange="updateCompany(this.value)" placeholder="Ex: Google, Microsoft..." class="w-full px-4 py-2 border rounded-lg" />' +
-                '<p class="text-xs text-blue-700 mt-2">Cette information sera automatiquement ajoutée aux nouveaux profils</p>' +
+                '<div class="flex items-start gap-4">' +
+                    '<div class="flex-1">' +
+                        '<h3 class="text-lg font-bold text-blue-900 mb-2">🏛️ Cyrus Herez - Gestion Patrimoniale</h3>' +
+                        '<p class="text-sm text-blue-800 mb-3">' + state.companyMission + '</p>' +
+                        '<div class="grid grid-cols-2 gap-2 text-xs">' +
+                            '<div class="bg-white/50 p-2 rounded">' +
+                                '<span class="font-semibold">Valeurs clés :</span> Indépendance • Intégrité • Transparence • Excellence' +
+                            '</div>' +
+                            '<div class="bg-white/50 p-2 rounded">' +
+                                '<span class="font-semibold">Expertise :</span> Conseil patrimonial • Gestion financière • Immobilier' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
             '</div>';
 
             // Stats
             if (state.employees.length > 0) {
-                html += '<div class="grid grid-cols-3 gap-4">' +
+                html += '<div class="grid grid-cols-4 gap-4">' +
                     '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
                         '<p class="text-3xl font-bold text-blue-600">' + state.employees.length + '</p>' +
                         '<p class="text-sm text-gray-600">Profils</p>' +
+                    '</div>' +
+                    '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
+                        '<p class="text-3xl font-bold text-indigo-600">' + avgLinkedInScore + '</p>' +
+                        '<p class="text-sm text-gray-600">Score LinkedIn moyen</p>' +
                     '</div>' +
                     '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
                         '<p class="text-3xl font-bold text-green-600">' + avgScore + '</p>' +
                         '<p class="text-sm text-gray-600">Score ADN moyen</p>' +
                     '</div>' +
                     '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
-                        '<p class="text-3xl font-bold text-purple-600">' + state.employees.filter(e => e.globalScore >= 70).length + '</p>' +
-                        '<p class="text-sm text-gray-600">Profils alignés</p>' +
+                        '<p class="text-3xl font-bold text-purple-600">' + state.employees.filter(e => e.linkedinGlobalScore >= 70).length + '</p>' +
+                        '<p class="text-sm text-gray-600">Profils excellents</p>' +
                     '</div>' +
                 '</div>';
             }
@@ -358,6 +461,10 @@
                         '</div>' +
                         '<div class="flex gap-2">' +
                             '<div class="text-center">' +
+                                '<div class="px-3 py-1 rounded-full text-sm font-semibold ' + getScoreBadge(emp.linkedinGlobalScore || 0) + '">' + (emp.linkedinGlobalScore || 0) + '</div>' +
+                                '<p class="text-xs text-gray-500 mt-1">LinkedIn</p>' +
+                            '</div>' +
+                            '<div class="text-center">' +
                                 '<div class="px-3 py-1 rounded-full text-sm font-semibold ' + getScoreBadge(emp.globalScore) + '">' + emp.globalScore + '</div>' +
                                 '<p class="text-xs text-gray-500 mt-1">ADN</p>' +
                             '</div>' +
@@ -378,18 +485,26 @@
             // Empty state
             if (state.employees.length === 0) {
                 html += '<div class="text-center py-12 bg-white rounded-lg">' +
-                    '<div class="text-6xl mb-4">📋</div>' +
-                    '<h3 class="text-lg font-semibold text-gray-900 mb-2">Aucun profil pour le moment</h3>' +
-                    '<p class="text-gray-600 mb-4">Commencez par copier un profil LinkedIn puis cliquez sur "Coller rapidement"</p>' +
+                    '<div class="text-6xl mb-4">📊</div>' +
+                    '<h3 class="text-lg font-semibold text-gray-900 mb-2">Aucun profil analysé pour le moment</h3>' +
+                    '<p class="text-gray-600 mb-4">Commencez à évaluer l\'alignement des profils avec l\'ADN de Cyrus Herez</p>' +
                     '<div class="text-sm text-gray-500 max-w-md mx-auto">' +
-                        '<p class="font-medium mb-2">💡 Comment faire ?</p>' +
+                        '<p class="font-medium mb-2">💡 Comment analyser un profil LinkedIn ?</p>' +
                         '<ol class="text-left space-y-2 bg-blue-50 p-4 rounded-lg">' +
-                            '<li>1️⃣ Ouvrez un profil LinkedIn dans votre navigateur</li>' +
+                            '<li>1️⃣ Ouvrez un profil LinkedIn (collaborateur, candidat, partenaire...)</li>' +
                             '<li>2️⃣ Sélectionnez tout le texte (Ctrl+A ou Cmd+A)</li>' +
                             '<li>3️⃣ Copiez le texte (Ctrl+C ou Cmd+C)</li>' +
                             '<li>4️⃣ Cliquez sur "⚡ Coller rapidement"</li>' +
                             '<li>5️⃣ Collez dans la fenêtre qui s\'ouvre (Ctrl+V ou Cmd+V)</li>' +
+                            '<li>6️⃣ L\'analyse se fait automatiquement selon les 4 axes ADN !</li>' +
                         '</ol>' +
+                        '<div class="mt-4 p-3 bg-green-50 rounded text-left">' +
+                            '<p class="font-semibold text-green-800 mb-1">📈 Axes d\'analyse :</p>' +
+                            '<p class="text-xs text-green-700">• Excellence patrimoniale & Expertise (30%)</p>' +
+                            '<p class="text-xs text-green-700">• Indépendance & Intégrité (25%)</p>' +
+                            '<p class="text-xs text-green-700">• Approche sur-mesure & Client (25%)</p>' +
+                            '<p class="text-xs text-green-700">• Vision long-terme & Durabilité (20%)</p>' +
+                        '</div>' +
                     '</div>' +
                 '</div>';
             }
@@ -426,23 +541,82 @@
 
             html += '<div class="bg-white p-6 rounded-lg shadow-sm">' +
                 '<h3 class="text-lg font-semibold mb-4">🏆 Scores globaux</h3>' +
-                '<div class="grid grid-cols-2 gap-6">' +
+                '<div class="grid grid-cols-3 gap-6">' +
                     '<div>' +
-                        '<p class="text-sm text-gray-600 mb-2">Score ADN de marque</p>' +
+                        '<p class="text-sm text-gray-600 mb-2">🔵 Score LinkedIn</p>' +
+                        '<div class="flex items-baseline gap-2">' +
+                            '<span class="text-4xl font-bold ' + getScoreColor(emp.linkedinGlobalScore || 0) + '">' + (emp.linkedinGlobalScore || 0) + '</span>' +
+                            '<span class="text-gray-500">/100</span>' +
+                        '</div>' +
+                        '<p class="text-xs text-gray-500 mt-1">Qualité du profil</p>' +
+                    '</div>' +
+                    '<div>' +
+                        '<p class="text-sm text-gray-600 mb-2">🧬 Score ADN</p>' +
                         '<div class="flex items-baseline gap-2">' +
                             '<span class="text-4xl font-bold ' + getScoreColor(emp.globalScore) + '">' + emp.globalScore + '</span>' +
                             '<span class="text-gray-500">/100</span>' +
                         '</div>' +
+                        '<p class="text-xs text-gray-500 mt-1">Alignement marque</p>' +
                     '</div>' +
                     '<div>' +
-                        '<p class="text-sm text-gray-600 mb-2">Score métier</p>' +
+                        '<p class="text-sm text-gray-600 mb-2">💼 Score métier</p>' +
                         '<div class="flex items-baseline gap-2">' +
                             '<span class="text-4xl font-bold ' + getScoreColor(emp.deptScore) + '">' + emp.deptScore + '</span>' +
                             '<span class="text-gray-500">/100</span>' +
                         '</div>' +
+                        '<p class="text-xs text-gray-500 mt-1">Expertise secteur</p>' +
                     '</div>' +
                 '</div>' +
             '</div>';
+
+            // Détail du Score LinkedIn
+            if (emp.linkedinGlobalScore) {
+                html += '<div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">' +
+                    '<h3 class="text-lg font-semibold mb-4 text-blue-900">🔵 Détail du Score LinkedIn</h3>' +
+                    '<div class="grid grid-cols-2 gap-4">' +
+                        '<div class="bg-white p-4 rounded-lg">' +
+                            '<div class="flex items-center justify-between mb-2">' +
+                                '<span class="text-sm font-medium text-gray-700">📝 Complétude</span>' +
+                                '<span class="text-lg font-bold ' + getScoreColor(emp.completudeScore || 0) + '">' + (emp.completudeScore || 0) + '/100</span>' +
+                            '</div>' +
+                            '<div class="w-full bg-gray-200 rounded-full h-2">' +
+                                '<div class="h-2 rounded-full bg-blue-500" style="width: ' + (emp.completudeScore || 0) + '%"></div>' +
+                            '</div>' +
+                            '<p class="text-xs text-gray-600 mt-1">Richesse du profil, sections remplies</p>' +
+                        '</div>' +
+                        '<div class="bg-white p-4 rounded-lg">' +
+                            '<div class="flex items-center justify-between mb-2">' +
+                                '<span class="text-sm font-medium text-gray-700">🎯 Cohérence</span>' +
+                                '<span class="text-lg font-bold ' + getScoreColor(emp.coherenceScore || 0) + '">' + (emp.coherenceScore || 0) + '/100</span>' +
+                            '</div>' +
+                            '<div class="w-full bg-gray-200 rounded-full h-2">' +
+                                '<div class="h-2 rounded-full bg-green-500" style="width: ' + (emp.coherenceScore || 0) + '%"></div>' +
+                            '</div>' +
+                            '<p class="text-xs text-gray-600 mt-1">Alignement avec l\'ADN Cyrus Herez</p>' +
+                        '</div>' +
+                        '<div class="bg-white p-4 rounded-lg">' +
+                            '<div class="flex items-center justify-between mb-2">' +
+                                '<span class="text-sm font-medium text-gray-700">🔍 Visibilité SEO</span>' +
+                                '<span class="text-lg font-bold ' + getScoreColor(emp.visibilityScore || 0) + '">' + (emp.visibilityScore || 0) + '/100</span>' +
+                            '</div>' +
+                            '<div class="w-full bg-gray-200 rounded-full h-2">' +
+                                '<div class="h-2 rounded-full bg-purple-500" style="width: ' + (emp.visibilityScore || 0) + '%"></div>' +
+                            '</div>' +
+                            '<p class="text-xs text-gray-600 mt-1">Mots-clés métier : ' + (emp.foundSEOKeywords ? emp.foundSEOKeywords.length : 0) + ' trouvés</p>' +
+                        '</div>' +
+                        '<div class="bg-white p-4 rounded-lg">' +
+                            '<div class="flex items-center justify-between mb-2">' +
+                                '<span class="text-sm font-medium text-gray-700">⚡ Engagement</span>' +
+                                '<span class="text-lg font-bold ' + getScoreColor(emp.engagementScore || 0) + '">' + (emp.engagementScore || 0) + '/100</span>' +
+                            '</div>' +
+                            '<div class="w-full bg-gray-200 rounded-full h-2">' +
+                                '<div class="h-2 rounded-full bg-orange-500" style="width: ' + (emp.engagementScore || 0) + '%"></div>' +
+                            '</div>' +
+                            '<p class="text-xs text-gray-600 mt-1">Impact, résultats, verbes d\'action</p>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            }
 
             html += '<div class="bg-blue-50 p-6 rounded-lg border border-blue-200">' +
                 '<h3 class="text-lg font-semibold mb-2 text-blue-900">📊 Analyse synthétique</h3>' +
@@ -500,6 +674,28 @@
                         '<p class="text-sm text-orange-700">💡 Suggestions: <span class="font-medium">' + axis.missingKeywords.slice(0, 5).join(', ') + '</span></p>' +
                     '</div>';
                 });
+                
+                html += '</div></div>';
+            }
+
+            // Recommandations LinkedIn
+            if (emp.linkedinGlobalScore && emp.linkedinGlobalScore < 70) {
+                html += '<div class="bg-blue-50 p-6 rounded-lg border border-blue-200">' +
+                    '<h3 class="text-lg font-semibold mb-3 text-blue-900">💡 Recommandations pour améliorer le profil LinkedIn</h3>' +
+                    '<div class="space-y-2 text-sm text-blue-800">';
+                
+                if (emp.completudeScore < 70) {
+                    html += '<p>• <strong>Complétude :</strong> Enrichir le profil avec plus de détails sur les expériences, compétences et réalisations</p>';
+                }
+                if (emp.coherenceScore < 70) {
+                    html += '<p>• <strong>Cohérence :</strong> Intégrer les mots-clés ADN Cyrus Herez : ' + state.brandDNA.map(a => a.name).slice(0, 2).join(', ') + '</p>';
+                }
+                if (emp.visibilityScore < 70) {
+                    html += '<p>• <strong>Visibilité :</strong> Ajouter des mots-clés stratégiques : patrimoine, gestion, conseil, stratégie, investissement</p>';
+                }
+                if (emp.engagementScore < 70) {
+                    html += '<p>• <strong>Engagement :</strong> Utiliser des verbes d\'action et quantifier les résultats (chiffres, impacts)</p>';
+                }
                 
                 html += '</div></div>';
             }
