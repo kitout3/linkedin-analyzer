@@ -164,7 +164,64 @@
             };
         }
 
-        // Calculate LinkedIn Score
+        // Calculate Social Selling Index (SSI)
+        function calculateSSI(profileText, employee) {
+            const text = profileText.toLowerCase();
+            const words = processText(profileText);
+            const wordCount = words.length;
+            
+            // 1. Construction de la marque professionnelle (0-25)
+            let brandScore = 0;
+            brandScore += (employee.firstName && employee.lastName) ? 5 : 0;
+            brandScore += employee.position ? 5 : 0;
+            brandScore += wordCount >= 200 ? 10 : (wordCount >= 100 ? 5 : 0);
+            brandScore += (text.includes('expert') || text.includes('spécialiste') || text.includes('passion')) ? 5 : 0;
+            
+            // 2. Trouver les bonnes personnes (0-25)
+            let peopleScore = 0;
+            const networkKeywords = ['réseau', 'network', 'professionnel', 'contact', 'relation', 'partenaire', 'collaboration'];
+            const foundNetwork = networkKeywords.filter(k => text.includes(k)).length;
+            peopleScore = Math.min(25, foundNetwork * 4);
+            
+            // 3. Échanger des informations (0-25)
+            let engagementScore = 0;
+            const engageKeywords = ['partage', 'publication', 'article', 'insight', 'analyse', 'expertise', 'conseil', 'contribution'];
+            const foundEngage = engageKeywords.filter(k => text.includes(k)).length;
+            engagementScore = Math.min(25, foundEngage * 3.5);
+            
+            // 4. Établir des relations (0-25)
+            let relationScore = 0;
+            const relationKeywords = ['accompagnement', 'écoute', 'client', 'confiance', 'long-terme', 'fidélité', 'suivi', 'proximité'];
+            const foundRelation = relationKeywords.filter(k => text.includes(k)).length;
+            relationScore = Math.min(25, foundRelation * 3.5);
+            
+            // Score SSI global (0-100)
+            const ssiScore = Math.round(brandScore + peopleScore + engagementScore + relationScore);
+            
+            // Classements (simulation basée sur le score)
+            let sectorRanking = 50;
+            let networkRanking = 50;
+            if (ssiScore >= 75) { sectorRanking = 10; networkRanking = 15; }
+            else if (ssiScore >= 60) { sectorRanking = 20; networkRanking = 24; }
+            else if (ssiScore >= 45) { sectorRanking = 35; networkRanking = 40; }
+            else if (ssiScore >= 30) { sectorRanking = 50; networkRanking = 55; }
+            
+            // Scores moyens (benchmarks)
+            const avgSectorScore = 32;
+            const avgNetworkScore = 36;
+            
+            return {
+                ssiScore: ssiScore,
+                ssiBrandScore: Math.round(brandScore),
+                ssiPeopleScore: Math.round(peopleScore),
+                ssiEngagementScore: Math.round(engagementScore),
+                ssiRelationScore: Math.round(relationScore),
+                ssiSectorRanking: sectorRanking,
+                ssiNetworkRanking: networkRanking,
+                ssiAvgSectorScore: avgSectorScore,
+                ssiAvgNetworkScore: avgNetworkScore
+            };
+        }
         function calculateLinkedInScore(profileText, employee) {
             const text = profileText.toLowerCase();
             const words = processText(profileText);
@@ -287,10 +344,14 @@
             const linkedinScores = calculateLinkedInScore(text, newEmployee);
             Object.assign(newEmployee, linkedinScores);
 
+            // Calculate SSI scores
+            const ssiScores = calculateSSI(text, newEmployee);
+            Object.assign(newEmployee, ssiScores);
+
             state.employees.push(newEmployee);
             saveState();
             render();
-            alert('✅ Profil ajouté : ' + newEmployee.firstName + ' ' + newEmployee.lastName + '\n📊 Score ADN : ' + newEmployee.globalScore + '/100' + '\n🔵 Score LinkedIn : ' + newEmployee.linkedinGlobalScore + '/100' + '\n💼 Score Métier : ' + newEmployee.deptScore + '/100');
+            alert('✅ Profil ajouté : ' + newEmployee.firstName + ' ' + newEmployee.lastName + '\n\n📊 Score SSI : ' + newEmployee.ssiScore + '/100\n🔵 Score LinkedIn : ' + newEmployee.linkedinGlobalScore + '/100' + '\n🧬 Score ADN : ' + newEmployee.globalScore + '/100' + '\n💼 Score Métier : ' + newEmployee.deptScore + '/100');
         }
 
         // Delete employee
@@ -404,6 +465,10 @@
             const linkedinScores = calculateLinkedInScore(profileText, newEmployee);
             Object.assign(newEmployee, linkedinScores);
 
+            // Calculate SSI scores
+            const ssiScores = calculateSSI(profileText, newEmployee);
+            Object.assign(newEmployee, ssiScores);
+
             state.employees.push(newEmployee);
             saveState();
             state.currentView = 'list';
@@ -436,6 +501,9 @@
             const avgLinkedInScore = state.employees.length > 0 
                 ? Math.round(state.employees.reduce((sum, emp) => sum + (emp.linkedinGlobalScore || 0), 0) / state.employees.length)
                 : 0;
+            const avgSSIScore = state.employees.length > 0 
+                ? Math.round(state.employees.reduce((sum, emp) => sum + (emp.ssiScore || 0), 0) / state.employees.length)
+                : 0;
 
             let html = '<div class="space-y-4">';
             
@@ -459,22 +527,26 @@
 
             // Stats
             if (state.employees.length > 0) {
-                html += '<div class="grid grid-cols-4 gap-4">' +
+                html += '<div class="grid grid-cols-5 gap-4">' +
                     '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
                         '<p class="text-3xl font-bold text-blue-600">' + state.employees.length + '</p>' +
                         '<p class="text-sm text-gray-600">Profils</p>' +
                     '</div>' +
                     '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
+                        '<p class="text-3xl font-bold text-purple-600">' + avgSSIScore + '</p>' +
+                        '<p class="text-sm text-gray-600">SSI moyen</p>' +
+                    '</div>' +
+                    '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
                         '<p class="text-3xl font-bold text-indigo-600">' + avgLinkedInScore + '</p>' +
-                        '<p class="text-sm text-gray-600">Score LinkedIn moyen</p>' +
+                        '<p class="text-sm text-gray-600">LinkedIn moyen</p>' +
                     '</div>' +
                     '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
                         '<p class="text-3xl font-bold text-green-600">' + avgScore + '</p>' +
-                        '<p class="text-sm text-gray-600">Score ADN moyen</p>' +
+                        '<p class="text-sm text-gray-600">ADN moyen</p>' +
                     '</div>' +
                     '<div class="bg-white p-4 rounded-lg shadow-sm text-center">' +
-                        '<p class="text-3xl font-bold text-purple-600">' + state.employees.filter(e => e.linkedinGlobalScore >= 70).length + '</p>' +
-                        '<p class="text-sm text-gray-600">Profils excellents</p>' +
+                        '<p class="text-3xl font-bold text-orange-600">' + state.employees.filter(e => e.ssiScore >= 75).length + '</p>' +
+                        '<p class="text-sm text-gray-600">SSI excellents</p>' +
                     '</div>' +
                 '</div>';
             }
@@ -510,6 +582,10 @@
                             (emp.email ? '<div class="mt-1"><span class="text-xs text-gray-500">✉️ ' + emp.email + '</span></div>' : '') +
                         '</div>' +
                         '<div class="flex gap-2">' +
+                            '<div class="text-center">' +
+                                '<div class="px-3 py-1 rounded-full text-sm font-semibold ' + getScoreBadge(emp.ssiScore || 0) + '">' + (emp.ssiScore || 0) + '</div>' +
+                                '<p class="text-xs text-gray-500 mt-1">SSI</p>' +
+                            '</div>' +
                             '<div class="text-center">' +
                                 '<div class="px-3 py-1 rounded-full text-sm font-semibold ' + getScoreBadge(emp.linkedinGlobalScore || 0) + '">' + (emp.linkedinGlobalScore || 0) + '</div>' +
                                 '<p class="text-xs text-gray-500 mt-1">LinkedIn</p>' +
@@ -635,12 +711,136 @@
                 
                 html += '</div>';
             }
+
+            // Social Selling Index (SSI)
+            if (emp.ssiScore !== undefined) {
+                html += '<div class="bg-gradient-to-r from-indigo-50 to-blue-50 p-6 rounded-lg border border-indigo-200">' +
+                    '<h3 class="text-lg font-semibold mb-4 text-indigo-900">📊 Social Selling Index (SSI)</h3>' +
+                    '<p class="text-sm text-indigo-700 mb-4">Le SSI mesure ton activité sur LinkedIn selon 4 critères clés</p>' +
+                    
+                    '<div class="grid grid-cols-2 gap-4 mb-4">' +
+                        // SSI Score principal
+                        '<div class="bg-white p-4 rounded-lg col-span-2">' +
+                            '<div class="text-center">' +
+                                '<p class="text-sm text-gray-600 mb-2">Social Selling Index actuel</p>' +
+                                '<div class="relative inline-block">' +
+                                    '<svg class="w-32 h-32">' +
+                                        '<circle cx="64" cy="64" r="56" fill="none" stroke="#e5e7eb" stroke-width="8"></circle>' +
+                                        '<circle cx="64" cy="64" r="56" fill="none" stroke="url(#ssi-gradient)" stroke-width="8" stroke-dasharray="' + (emp.ssiScore * 3.52) + ' 352" stroke-linecap="round" transform="rotate(-90 64 64)"></circle>' +
+                                        '<defs>' +
+                                            '<linearGradient id="ssi-gradient" x1="0%" y1="0%" x2="100%" y2="0%">' +
+                                                '<stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />' +
+                                                '<stop offset="50%" style="stop-color:#8b5cf6;stop-opacity:1" />' +
+                                                '<stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />' +
+                                            '</linearGradient>' +
+                                        '</defs>' +
+                                    '</svg>' +
+                                    '<div class="absolute inset-0 flex flex-col items-center justify-center">' +
+                                        '<span class="text-4xl font-bold ' + getScoreColor(emp.ssiScore) + '">' + emp.ssiScore + '</span>' +
+                                        '<span class="text-sm text-gray-500">sur 100</span>' +
+                                    '</div>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        
+                        // Classements
+                        '<div class="bg-white p-4 rounded-lg">' +
+                            '<p class="text-xs font-medium text-gray-600 mb-2">Classement SSI Secteurs</p>' +
+                            '<p class="text-sm text-gray-500 mb-1">Top</p>' +
+                            '<p class="text-3xl font-bold text-indigo-600">' + emp.ssiSectorRanking + '<span class="text-lg">%</span></p>' +
+                            '<p class="text-xs text-gray-500 mt-2">Score moyen secteur : ' + emp.ssiAvgSectorScore + '/100</p>' +
+                        '</div>' +
+                        
+                        '<div class="bg-white p-4 rounded-lg">' +
+                            '<p class="text-xs font-medium text-gray-600 mb-2">Classement SSI Réseaux</p>' +
+                            '<p class="text-sm text-gray-500 mb-1">Top</p>' +
+                            '<p class="text-3xl font-bold text-blue-600">' + emp.ssiNetworkRanking + '<span class="text-lg">%</span></p>' +
+                            '<p class="text-xs text-gray-500 mt-2">Score moyen réseau : ' + emp.ssiAvgNetworkScore + '/100</p>' +
+                        '</div>' +
+                    '</div>' +
+                    
+                    // Les 4 facteurs
+                    '<div class="bg-white p-4 rounded-lg">' +
+                        '<p class="font-semibold text-gray-800 mb-3">Les quatre facteurs composant votre score</p>' +
+                        '<div class="space-y-3">' +
+                            // Facteur 1
+                            '<div>' +
+                                '<div class="flex items-center justify-between mb-1">' +
+                                    '<span class="text-sm text-gray-700">🏆 Construction de ta marque professionnelle</span>' +
+                                    '<span class="text-sm font-bold ' + getScoreColor(emp.ssiBrandScore * 4) + '">' + emp.ssiBrandScore + '/25</span>' +
+                                '</div>' +
+                                '<div class="w-full bg-gray-200 rounded-full h-2">' +
+                                    '<div class="h-2 rounded-full bg-gradient-to-r from-orange-400 to-orange-600" style="width: ' + (emp.ssiBrandScore * 4) + '%"></div>' +
+                                '</div>' +
+                            '</div>' +
+                            
+                            // Facteur 2
+                            '<div>' +
+                                '<div class="flex items-center justify-between mb-1">' +
+                                    '<span class="text-sm text-gray-700">👥 Trouver les bonnes personnes</span>' +
+                                    '<span class="text-sm font-bold ' + getScoreColor(emp.ssiPeopleScore * 4) + '">' + emp.ssiPeopleScore + '/25</span>' +
+                                '</div>' +
+                                '<div class="w-full bg-gray-200 rounded-full h-2">' +
+                                    '<div class="h-2 rounded-full bg-gradient-to-r from-blue-400 to-blue-600" style="width: ' + (emp.ssiPeopleScore * 4) + '%"></div>' +
+                                '</div>' +
+                            '</div>' +
+                            
+                            // Facteur 3
+                            '<div>' +
+                                '<div class="flex items-center justify-between mb-1">' +
+                                    '<span class="text-sm text-gray-700">💬 Échanger des informations</span>' +
+                                    '<span class="text-sm font-bold ' + getScoreColor(emp.ssiEngagementScore * 4) + '">' + emp.ssiEngagementScore + '/25</span>' +
+                                '</div>' +
+                                '<div class="w-full bg-gray-200 rounded-full h-2">' +
+                                    '<div class="h-2 rounded-full bg-gradient-to-r from-purple-400 to-purple-600" style="width: ' + (emp.ssiEngagementScore * 4) + '%"></div>' +
+                                '</div>' +
+                            '</div>' +
+                            
+                            // Facteur 4
+                            '<div>' +
+                                '<div class="flex items-center justify-between mb-1">' +
+                                    '<span class="text-sm text-gray-700">🤝 Établir des relations</span>' +
+                                    '<span class="text-sm font-bold ' + getScoreColor(emp.ssiRelationScore * 4) + '">' + emp.ssiRelationScore + '/25</span>' +
+                                '</div>' +
+                                '<div class="w-full bg-gray-200 rounded-full h-2">' +
+                                    '<div class="h-2 rounded-full bg-gradient-to-r from-green-400 to-green-600" style="width: ' + (emp.ssiRelationScore * 4) + '%"></div>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    
+                    // Interprétation
+                    '<div class="mt-4 p-4 bg-blue-50 rounded-lg">' +
+                        '<p class="text-sm font-semibold text-blue-900 mb-2">💡 Interprétation :</p>' +
+                        '<p class="text-xs text-blue-800">';
+                
+                if (emp.ssiScore >= 75) {
+                    html += '🌟 Excellent ! Tu es dans le Top ' + emp.ssiSectorRanking + '% de ton secteur. Continue à développer ton réseau et à partager ton expertise.';
+                } else if (emp.ssiScore >= 60) {
+                    html += '✅ Très bon ! Tu te positionnes dans le Top ' + emp.ssiSectorRanking + '% de ton secteur. Tu es sur la bonne voie.';
+                } else if (emp.ssiScore >= 45) {
+                    html += '📈 Moyen. Tu as un potentiel d\'amélioration. Focus sur l\'engagement et la création de contenu.';
+                } else {
+                    html += '⚠️ À améliorer. Renforce ta présence LinkedIn : complète ton profil, développe ton réseau, partage du contenu pertinent.';
+                }
+                
+                html += '</p></div>' +
+                '</div>';
+            }
             
             html += '</div>';
 
             html += '<div class="bg-white p-6 rounded-lg shadow-sm">' +
                 '<h3 class="text-lg font-semibold mb-4">🏆 Scores globaux</h3>' +
-                '<div class="grid grid-cols-3 gap-6">' +
+                '<div class="grid grid-cols-4 gap-4">' +
+                    '<div>' +
+                        '<p class="text-sm text-gray-600 mb-2">📊 Score SSI</p>' +
+                        '<div class="flex items-baseline gap-2">' +
+                            '<span class="text-4xl font-bold ' + getScoreColor(emp.ssiScore || 0) + '">' + (emp.ssiScore || 0) + '</span>' +
+                            '<span class="text-gray-500">/100</span>' +
+                        '</div>' +
+                        '<p class="text-xs text-gray-500 mt-1">Social Selling Index</p>' +
+                    '</div>' +
                     '<div>' +
                         '<p class="text-sm text-gray-600 mb-2">🔵 Score LinkedIn</p>' +
                         '<div class="flex items-baseline gap-2">' +
