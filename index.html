@@ -223,33 +223,286 @@
             return { ssiScore, ssiBrandScore: Math.round(brandScore), ssiPeopleScore: Math.round(peopleScore), ssiEngagementScore: Math.round(engagementScore), ssiRelationScore: Math.round(relationScore), ssiSectorRanking: sectorRanking, ssiNetworkRanking: networkRanking, ssiAvgSectorScore: 32, ssiAvgNetworkScore: 36 };
         }
 
+        // ===== SCORE LINKEDIN PRO (Grille d'évaluation professionnelle) =====
         function calculateLinkedInScore(profileText, employee) {
             const text = profileText.toLowerCase();
-            const words = processText(profileText);
-            const wordCount = words.length;
-            const sections = {
-                hasName: (employee.firstName && employee.lastName) ? 20 : 0,
-                hasPosition: employee.position ? 15 : 0,
-                hasCompany: employee.company ? 10 : 0,
-                hasRichContent: wordCount >= 200 ? 25 : (wordCount >= 100 ? 15 : wordCount >= 50 ? 10 : 0),
-                hasExperience: (text.includes('expérience') || text.includes('experience') || text.includes('depuis') || text.includes('années')) ? 15 : 0,
-                hasSkills: (text.includes('compétence') || text.includes('expertise') || text.includes('maîtrise') || text.includes('skills')) ? 15 : 0
+            const normalizedText = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const wordCount = processText(profileText).length;
+            
+            // ===== 1. IDENTITÉ & CRÉDIBILITÉ IMMÉDIATE (15 pts) =====
+            
+            // 1.1 Photo de profil (5 pts) - On ne peut pas détecter, on suppose présente si profil complet
+            const hasPhotoIndicators = text.includes('photo') || text.includes('image') || wordCount > 100;
+            const photoScore = hasPhotoIndicators ? 3 : 0; // Score conservateur
+            
+            // 1.2 Titre professionnel (5 pts)
+            let headlineScore = 0;
+            const headlineKeywords = ['senior', 'lead', 'head', 'manager', 'directeur', 'expert', 'specialist', 'consultant', 'engineer', 'developer', 'responsable', 'chef'];
+            const valueKeywords = ['|', '•', '-', 'spécialisé', 'expert en', 'passionné'];
+            const hasProTitle = headlineKeywords.some(k => normalizedText.includes(k));
+            const hasTitleStructure = valueKeywords.some(k => text.includes(k));
+            if (hasProTitle && hasTitleStructure) headlineScore = 5;
+            else if (hasProTitle || employee.position) headlineScore = 3;
+            else if (employee.position) headlineScore = 2;
+            
+            // 1.3 Localisation & disponibilité (5 pts)
+            const locationKeywords = ['paris', 'lyon', 'marseille', 'bordeaux', 'nantes', 'toulouse', 'lille', 'france', 'région', 'île-de-france', 'remote', 'télétravail', 'hybride'];
+            const hasLocation = locationKeywords.some(l => normalizedText.includes(l));
+            const hasCurrentJob = text.includes('actuel') || text.includes('current') || text.includes('présent') || text.includes('depuis');
+            const locationScore = (hasLocation ? 3 : 0) + (hasCurrentJob ? 2 : 0);
+            
+            const identityScore = photoScore + headlineScore + locationScore; // Max 15
+            
+            // ===== 2. PROPOSITION DE VALEUR & POSITIONNEMENT (20 pts) =====
+            
+            // 2.1 Résumé / À propos (10 pts)
+            let summaryScore = 0;
+            const hasNumbers = /\d+/.test(text);
+            const hasResults = ['résultat', 'impact', 'réalis', 'atteint', 'développ', 'augment', 'réduit', 'optimis', 'amélio', 'généré'].some(r => normalizedText.includes(r));
+            const hasStructure = text.includes('•') || text.includes('-') || text.includes('|') || text.includes(':');
+            const hasBusiness = ['business', 'ca', 'chiffre', 'client', 'stratég', 'croissance', 'performance'].some(b => normalizedText.includes(b));
+            
+            if (hasNumbers && hasResults && hasBusiness) summaryScore = 10;
+            else if (hasResults && (hasNumbers || hasBusiness)) summaryScore = 7;
+            else if (hasResults || hasBusiness) summaryScore = 5;
+            else if (wordCount > 50) summaryScore = 3;
+            
+            // 2.2 Cohérence du positionnement (10 pts)
+            let coherenceScore = 0;
+            // Vérifier si les mots-clés du département apparaissent dans le profil
+            const deptKeywordsFound = employee.deptFoundKeywords?.length || 0;
+            const deptTotal = employee.deptTotalKeywords || 1;
+            const coherenceRatio = deptKeywordsFound / deptTotal;
+            
+            if (coherenceRatio >= 0.3) coherenceScore = 10;
+            else if (coherenceRatio >= 0.15) coherenceScore = 7;
+            else if (coherenceRatio >= 0.05) coherenceScore = 5;
+            else coherenceScore = 2;
+            
+            const positioningScore = summaryScore + coherenceScore; // Max 20
+            
+            // ===== 3. EXPÉRIENCE PROFESSIONNELLE (25 pts) =====
+            
+            // 3.1 Détail des expériences (15 pts)
+            let experienceDetailScore = 0;
+            const expKeywords = ['expérience', 'experience', 'poste', 'mission', 'responsab', 'projet', 'équipe', 'manage', 'pilote', 'développ'];
+            const hasExpDetail = expKeywords.filter(k => normalizedText.includes(k)).length;
+            const hasMetrics = /(\d+\s*%|\d+\s*[kKmM]?€|\d+\s*clients?|\d+\s*personnes?|\d+\s*projets?)/.test(text);
+            const hasImpact = ['augment', 'réduit', 'créé', 'lancé', 'négoci', 'signé', 'généré', 'optimis'].some(i => normalizedText.includes(i));
+            
+            if (hasExpDetail >= 4 && hasMetrics && hasImpact) experienceDetailScore = 15;
+            else if (hasExpDetail >= 3 && (hasMetrics || hasImpact)) experienceDetailScore = 12;
+            else if (hasExpDetail >= 2 && hasMetrics) experienceDetailScore = 10;
+            else if (hasExpDetail >= 2) experienceDetailScore = 8;
+            else if (hasExpDetail >= 1) experienceDetailScore = 5;
+            else experienceDetailScore = 3;
+            
+            // 3.2 Progression de carrière (10 pts)
+            let progressionScore = 0;
+            const seniorityTerms = ['junior', 'confirmé', 'senior', 'lead', 'manager', 'head', 'directeur', 'vp', 'chief', 'partner'];
+            const progressionTerms = ['promu', 'évolution', 'progression', 'nommé', 'devenu', 'promotion'];
+            const yearsPattern = /(\d+)\s*ans?/g;
+            const yearsMatches = [...normalizedText.matchAll(yearsPattern)];
+            const hasLongExp = yearsMatches.some(m => parseInt(m[1]) >= 5);
+            const hasSeniority = seniorityTerms.filter(s => normalizedText.includes(s)).length >= 2;
+            const hasProgression = progressionTerms.some(p => normalizedText.includes(p));
+            
+            if (hasProgression && hasSeniority) progressionScore = 10;
+            else if (hasLongExp && hasSeniority) progressionScore = 8;
+            else if (hasSeniority || hasLongExp) progressionScore = 6;
+            else if (hasProgression) progressionScore = 5;
+            else progressionScore = 3;
+            
+            const experienceScore = experienceDetailScore + progressionScore; // Max 25
+            
+            // ===== 4. COMPÉTENCES & EXPERTISE RÉELLE (20 pts) =====
+            
+            // 4.1 Compétences listées (10 pts)
+            let skillsScore = 0;
+            const skillsKeywords = ['compétence', 'skill', 'expertise', 'maîtrise', 'connaissance', 'savoir-faire', 'spécialité'];
+            const toolsFound = employee.atsFoundTools?.length || 0;
+            const hasSkillsSection = skillsKeywords.some(s => normalizedText.includes(s));
+            
+            if (toolsFound >= 5 && hasSkillsSection) skillsScore = 10;
+            else if (toolsFound >= 3 || (hasSkillsSection && deptKeywordsFound >= 5)) skillsScore = 8;
+            else if (toolsFound >= 1 || deptKeywordsFound >= 3) skillsScore = 6;
+            else if (hasSkillsSection) skillsScore = 4;
+            else skillsScore = 2;
+            
+            // 4.2 Validation sociale (10 pts)
+            let validationScore = 0;
+            const recoMatch = normalizedText.match(/(\d+)\s*recommandation/i);
+            const recoCount = recoMatch ? parseInt(recoMatch[1]) : 0;
+            const endorsementKeywords = ['validé', 'endorsed', 'recommand', 'témoign', 'référence'];
+            const hasEndorsements = endorsementKeywords.some(e => normalizedText.includes(e));
+            
+            if (recoCount >= 5 && hasEndorsements) validationScore = 10;
+            else if (recoCount >= 3 || hasEndorsements) validationScore = 7;
+            else if (recoCount >= 1) validationScore = 5;
+            else validationScore = 0;
+            
+            const competenceScore = skillsScore + validationScore; // Max 20
+            
+            // ===== 5. PREUVE D'ENGAGEMENT & VISIBILITÉ (10 pts) =====
+            
+            // 5.1 Activité LinkedIn (5 pts)
+            let activityScore = 0;
+            const activityKeywords = ['publication', 'article', 'post', 'partag', 'écrit', 'publi', 'auteur', 'contributeur'];
+            const hasActivity = activityKeywords.filter(a => normalizedText.includes(a)).length;
+            
+            if (hasActivity >= 3) activityScore = 5;
+            else if (hasActivity >= 1) activityScore = 3;
+            else activityScore = 0;
+            
+            // 5.2 Réseau & interactions (5 pts)
+            let networkScore = 0;
+            
+            // Fonction pour extraire les nombres avec séparateurs (espaces, points, virgules)
+            const extractNumber = (text, patterns) => {
+                for (const pattern of patterns) {
+                    const match = text.match(pattern);
+                    if (match) {
+                        // Nettoyer le nombre (enlever espaces, remplacer virgules)
+                        const numStr = match[1].replace(/[\s\u00A0\.]/g, '').replace(',', '');
+                        return parseInt(numStr) || 0;
+                    }
+                }
+                return 0;
             };
-            const completudeScore = Object.values(sections).reduce((a, b) => a + b, 0);
-            const coherenceScore = employee.globalScore;
-            const seoKeywords = ['patrimoine', 'gestion', 'conseil', 'stratégie', 'investissement', 'finance', 'immobilier', 'transmission', 'accompagnement', 'dirigeant', 'entrepreneur', 'famille', 'performance', 'optimisation', 'allocation'];
-            const foundSEOKeywords = seoKeywords.filter(kw => text.includes(kw));
-            const visibilityScore = Math.min(100, (foundSEOKeywords.length / seoKeywords.length) * 100 + (wordCount >= 200 ? 20 : 0));
-            const engagementIndicators = {
-                hasActionVerbs: /\b(accompagn|développ|conseill|aid|soutien|guid|optimis|transform|innov|créé|réalis|pilote)\w*/.test(text) ? 25 : 0,
-                hasNumbers: /\d+/.test(text) ? 20 : 0,
-                hasImpactWords: (text.includes('impact') || text.includes('résultat') || text.includes('succès') || text.includes('croissance') || text.includes('amélioration')) ? 25 : 0,
-                hasProfessionalTone: wordCount >= 150 ? 15 : (wordCount >= 80 ? 10 : 0),
-                hasClientFocus: (text.includes('client') || text.includes('partenaire') || text.includes('relation')) ? 15 : 0
+            
+            // Patterns pour détecter abonnés/followers
+            const followerPatterns = [
+                /([\d\s\u00A0.,]+)\s*abonn[ée]s?/i,
+                /([\d\s\u00A0.,]+)\s*followers?/i,
+                /abonn[ée]s?\s*:?\s*([\d\s\u00A0.,]+)/i,
+                /followers?\s*:?\s*([\d\s\u00A0.,]+)/i
+            ];
+            
+            // Patterns pour détecter relations/connexions
+            const connexionPatterns = [
+                /([\d\s\u00A0.,]+)\s*(?:relations?|connexions?|contacts?)/i,
+                /(?:relations?|connexions?|contacts?)\s*:?\s*([\d\s\u00A0.,]+)/i,
+                /plus de\s*([\d\s\u00A0.,]+)\s*(?:relations?|connexions?)/i,
+                /more than\s*([\d\s\u00A0.,]+)\s*(?:connections?|contacts?)/i
+            ];
+            
+            const followersCount = extractNumber(text, followerPatterns);
+            const connexionsCount = extractNumber(text, connexionPatterns);
+            
+            // Utiliser le max entre followers et connexions
+            const networkCount = Math.max(followersCount, connexionsCount);
+            
+            const networkKeywords = ['réseau', 'network', 'communauté', 'groupe', 'association', 'membre'];
+            const hasNetworkMention = networkKeywords.some(n => normalizedText.includes(n));
+            
+            // Score basé sur le réseau
+            if (networkCount >= 10000) networkScore = 5;
+            else if (networkCount >= 500 || text.includes('plus de 500')) networkScore = 5;
+            else if (networkCount >= 200) networkScore = 4;
+            else if (networkCount >= 100 || hasNetworkMention) networkScore = 3;
+            else if (networkCount > 0) networkScore = 2;
+            else networkScore = 1;
+            
+            const engagementScore = activityScore + networkScore; // Max 10
+            
+            // Stocker les valeurs détectées pour affichage
+            const detectedFollowers = followersCount;
+            const detectedConnexions = connexionsCount;
+            
+            // ===== 6. FORMATION & CRÉDIBILITÉ ACADÉMIQUE (10 pts) =====
+            
+            // 6.1 Formation initiale (5 pts)
+            let educationScore = 0;
+            const educationKeywords = ['diplôme', 'master', 'licence', 'bachelor', 'ingénieur', 'école', 'université', 'bac+', 'formation', 'mba', 'doctorat', 'phd'];
+            const prestigeSchools = ['hec', 'essec', 'escp', 'edhec', 'polytechnique', 'centrale', 'mines', 'dauphine', 'sciences po', 'insead', 'em lyon'];
+            const hasEducation = educationKeywords.filter(e => normalizedText.includes(e)).length;
+            const hasPrestige = prestigeSchools.some(s => normalizedText.includes(s));
+            
+            if (hasPrestige) educationScore = 5;
+            else if (hasEducation >= 2) educationScore = 5;
+            else if (hasEducation >= 1) educationScore = 3;
+            else educationScore = 0;
+            
+            // 6.2 Certifications / apprentissage continu (5 pts)
+            let certScore = 0;
+            const certKeywords = ['certifi', 'certified', 'certification', 'accrédité', 'agréé', 'habilité', 'cfa', 'amf', 'pmp', 'scrum', 'aws', 'google', 'microsoft', 'cisco'];
+            const recentLearning = ['formation continue', 'mooc', 'cours', 'learning', 'bootcamp', 'spécialisation'];
+            const hasCerts = certKeywords.filter(c => normalizedText.includes(c)).length;
+            const hasLearning = recentLearning.some(l => normalizedText.includes(l));
+            
+            if (hasCerts >= 3) certScore = 5;
+            else if (hasCerts >= 1 && hasLearning) certScore = 5;
+            else if (hasCerts >= 1) certScore = 4;
+            else if (hasLearning) certScore = 3;
+            else certScore = 0;
+            
+            const formationScore = educationScore + certScore; // Max 10
+            
+            // ===== SCORE TOTAL LINKEDIN PRO =====
+            const linkedinGlobalScore = Math.min(100, identityScore + positioningScore + experienceScore + competenceScore + engagementScore + formationScore);
+            
+            // ===== RÈGLES ÉLIMINATOIRES (No-Go) =====
+            const noGoReasons = [];
+            if (experienceDetailScore < 5) noGoReasons.push("Aucune expérience détaillée");
+            if (headlineScore < 2) noGoReasons.push("Titre non professionnel");
+            if (coherenceScore < 3) noGoReasons.push("Incohérences dans le positionnement");
+            if (wordCount < 50) noGoReasons.push("Profil trop succinct");
+            
+            const isNoGo = noGoReasons.length >= 2;
+            const finalScore = isNoGo ? Math.min(29, linkedinGlobalScore) : linkedinGlobalScore;
+            
+            // Déterminer le niveau
+            let linkedinLevel, linkedinVerdict;
+            if (isNoGo) {
+                linkedinLevel = "🔴 Non pertinent";
+                linkedinVerdict = "Profil éliminé (règles No-Go)";
+            } else if (finalScore >= 85) {
+                linkedinLevel = "🏆 Expert";
+                linkedinVerdict = "Profil hautement pertinent";
+            } else if (finalScore >= 70) {
+                linkedinLevel = "✅ Solide";
+                linkedinVerdict = "Profil solide et exploitable";
+            } else if (finalScore >= 50) {
+                linkedinLevel = "⚠️ Moyen";
+                linkedinVerdict = "Profil à approfondir";
+            } else if (finalScore >= 30) {
+                linkedinLevel = "🟠 Faible";
+                linkedinVerdict = "Profil peu différenciant";
+            } else {
+                linkedinLevel = "🔴 Insuffisant";
+                linkedinVerdict = "Profil non pertinent";
+            }
+            
+            return { 
+                linkedinGlobalScore: finalScore,
+                linkedinLevel,
+                linkedinVerdict,
+                linkedinIsNoGo: isNoGo,
+                linkedinNoGoReasons: noGoReasons,
+                // Scores détaillés
+                linkedinIdentityScore: identityScore,
+                linkedinPhotoScore: photoScore,
+                linkedinHeadlineScore: headlineScore,
+                linkedinLocationScore: locationScore,
+                linkedinPositioningScore: positioningScore,
+                linkedinSummaryScore: summaryScore,
+                linkedinCoherenceScore: coherenceScore,
+                linkedinExperienceScore: experienceScore,
+                linkedinExpDetailScore: experienceDetailScore,
+                linkedinProgressionScore: progressionScore,
+                linkedinCompetenceScore: competenceScore,
+                linkedinSkillsScore: skillsScore,
+                linkedinValidationScore: validationScore,
+                linkedinEngagementScore: engagementScore,
+                linkedinActivityScore: activityScore,
+                linkedinNetworkScore: networkScore,
+                linkedinFormationScore: formationScore,
+                linkedinEducationScore: educationScore,
+                linkedinCertScore: certScore,
+                // Valeurs détectées
+                linkedinFollowersCount: detectedFollowers,
+                linkedinConnexionsCount: detectedConnexions
             };
-            const engagementScore = Object.values(engagementIndicators).reduce((a, b) => a + b, 0);
-            const linkedinGlobalScore = Math.round((completudeScore + coherenceScore + visibilityScore + engagementScore) / 4);
-            return { linkedinGlobalScore, completudeScore: Math.round(completudeScore), coherenceScore: Math.round(coherenceScore), visibilityScore: Math.round(visibilityScore), engagementScore: Math.round(engagementScore), foundSEOKeywords };
         }
 
         // ===== SCORE ATS (Applicant Tracking System) =====
@@ -396,10 +649,28 @@
             });
             const stabilityScore = hasStability ? 3 : 1;
             
-            // Connexions LinkedIn
-            const connexionMatch = normalizedText.match(/(\d+)\s*(?:connexions?|relations?|contacts?)/i);
-            const connexionCount = connexionMatch ? parseInt(connexionMatch[1]) : 0;
-            const connexionScore = connexionCount >= 500 ? 2 : (connexionCount >= 200 ? 1 : 0);
+            // Connexions LinkedIn - Amélioration détection
+            const extractNetworkCount = (searchText) => {
+                const patterns = [
+                    /([\d\s\u00A0.,]+)\s*(?:connexions?|relations?|contacts?)/i,
+                    /(?:connexions?|relations?|contacts?)\s*:?\s*([\d\s\u00A0.,]+)/i,
+                    /plus de\s*([\d\s\u00A0.,]+)\s*(?:connexions?|relations?)/i,
+                    /([\d\s\u00A0.,]+)\s*(?:abonn[ée]s?|followers?)/i,
+                    /(?:abonn[ée]s?|followers?)\s*:?\s*([\d\s\u00A0.,]+)/i
+                ];
+                for (const pattern of patterns) {
+                    const match = searchText.match(pattern);
+                    if (match) {
+                        const numStr = match[1].replace(/[\s\u00A0\.]/g, '').replace(',', '');
+                        return parseInt(numStr) || 0;
+                    }
+                }
+                return 0;
+            };
+            
+            const atsNetworkCount = extractNetworkCount(text);
+            const hasPlus500 = text.includes('plus de 500') || text.includes('more than 500');
+            const connexionScore = (atsNetworkCount >= 500 || hasPlus500) ? 2 : (atsNetworkCount >= 200 ? 1 : 0);
             
             const credibility = Math.min(15, Math.round(recoScore + certScore + stabilityScore + connexionScore));
             
@@ -530,9 +801,10 @@
             state.employees.push(newEmployee);
             saveState();
             render();
+            const linkedinInfo = newEmployee.linkedinIsNoGo ? ' ⛔ NO-GO' : ' ' + newEmployee.linkedinLevel;
             alert('✅ Profil ajouté : ' + newEmployee.firstName + ' ' + newEmployee.lastName + 
                 '\n\n📊 Score SSI : ' + newEmployee.ssiScore + '/100' +
-                '\n🔵 Score LinkedIn : ' + newEmployee.linkedinGlobalScore + '/100' +
+                '\n🔵 Score LinkedIn Pro : ' + newEmployee.linkedinGlobalScore + '/100' + linkedinInfo +
                 '\n🧬 Score ADN : ' + newEmployee.globalScore + '/100' +
                 '\n💼 Score Métier : ' + newEmployee.deptScore + '/100' +
                 '\n🎯 Score ATS : ' + newEmployee.atsScore + '/100 ' + newEmployee.atsDecision);
@@ -730,6 +1002,190 @@
             }
             
             return recommendations;
+        }
+        
+        // ===== SYNTHÈSE ET PRÉCONISATIONS LINKEDIN PRO =====
+        function getLinkedInProSynthesis(emp) {
+            const score = emp.linkedinGlobalScore || 0;
+            const isNoGo = emp.linkedinIsNoGo || false;
+            
+            let description;
+            if (isNoGo) {
+                description = `Le profil de ${emp.firstName} présente des lacunes critiques qui le rendent inexploitable en l'état. ${(emp.linkedinNoGoReasons || []).length} règle(s) éliminatoire(s) détectée(s).`;
+            } else if (score >= 85) {
+                description = `Le profil de ${emp.firstName} est exemplaire : positionnement clair, expériences détaillées avec résultats, crédibilité établie. C'est un profil prêt pour le recrutement ou la prospection.`;
+            } else if (score >= 70) {
+                description = `${emp.firstName} dispose d'un profil professionnel solide et exploitable. Quelques optimisations le rendraient encore plus impactant.`;
+            } else if (score >= 50) {
+                description = `Le profil de ${emp.firstName} est correct mais manque de différenciation. Un travail sur la proposition de valeur et les résultats est conseillé.`;
+            } else if (score >= 30) {
+                description = `Le profil de ${emp.firstName} est faible et peu différenciant. Il nécessite une refonte importante pour être exploitable.`;
+            } else {
+                description = `Le profil de ${emp.firstName} n'est pas pertinent pour un usage professionnel. Une reconstruction complète est nécessaire.`;
+            }
+            
+            // Identifier les points forts et faibles
+            const sections = [
+                { name: "Identité & Crédibilité", score: emp.linkedinIdentityScore || 0, max: 15, icon: "👤" },
+                { name: "Proposition de valeur", score: emp.linkedinPositioningScore || 0, max: 20, icon: "💡" },
+                { name: "Expérience professionnelle", score: emp.linkedinExperienceScore || 0, max: 25, icon: "💼" },
+                { name: "Compétences & Expertise", score: emp.linkedinCompetenceScore || 0, max: 20, icon: "🛠️" },
+                { name: "Engagement & Visibilité", score: emp.linkedinEngagementScore || 0, max: 10, icon: "📢" },
+                { name: "Formation & Académique", score: emp.linkedinFormationScore || 0, max: 10, icon: "🎓" }
+            ];
+            
+            const strengths = sections.filter(s => (s.score / s.max) >= 0.7);
+            const weaknesses = sections.filter(s => (s.score / s.max) < 0.4);
+            
+            return { 
+                level: emp.linkedinLevel || '', 
+                verdict: emp.linkedinVerdict || '', 
+                description, 
+                strengths, 
+                weaknesses,
+                isNoGo,
+                noGoReasons: emp.linkedinNoGoReasons || [],
+                sections
+            };
+        }
+        
+        function getLinkedInProRecommendations(emp) {
+            const recommendations = [];
+            
+            // 1. Identité & Crédibilité
+            if ((emp.linkedinIdentityScore || 0) < 12) {
+                recommendations.push({
+                    priority: (emp.linkedinHeadlineScore || 0) < 3 ? "haute" : "moyenne",
+                    category: "👤 Identité & Crédibilité immédiate",
+                    section: "identity",
+                    score: emp.linkedinIdentityScore || 0,
+                    maxScore: 15,
+                    subsections: [
+                        { name: "Photo", score: emp.linkedinPhotoScore || 0, max: 5 },
+                        { name: "Titre", score: emp.linkedinHeadlineScore || 0, max: 5 },
+                        { name: "Localisation", score: emp.linkedinLocationScore || 0, max: 5 }
+                    ],
+                    actions: [
+                        "Ajouter une photo professionnelle (cadrage visage, fond neutre, sourire)",
+                        "Optimiser le titre avec métier + spécialité + valeur (ex: 'CGP | Transmission & Famille | Cyrus Herez')",
+                        "Renseigner la localisation et le statut actuel (poste en cours)"
+                    ]
+                });
+            }
+            
+            // 2. Proposition de valeur
+            if ((emp.linkedinPositioningScore || 0) < 15) {
+                recommendations.push({
+                    priority: (emp.linkedinSummaryScore || 0) < 5 ? "haute" : "moyenne",
+                    category: "💡 Proposition de valeur",
+                    section: "positioning",
+                    score: emp.linkedinPositioningScore || 0,
+                    maxScore: 20,
+                    subsections: [
+                        { name: "Résumé", score: emp.linkedinSummaryScore || 0, max: 10 },
+                        { name: "Cohérence", score: emp.linkedinCoherenceScore || 0, max: 10 }
+                    ],
+                    actions: [
+                        "Rédiger un résumé structuré (3-4 paragraphes) orienté résultats",
+                        "Inclure des chiffres et des réalisations concrètes",
+                        "Aligner le discours avec le positionnement métier",
+                        "Utiliser des mots-clés stratégiques pour le référencement"
+                    ]
+                });
+            }
+            
+            // 3. Expérience professionnelle
+            if ((emp.linkedinExperienceScore || 0) < 18) {
+                recommendations.push({
+                    priority: (emp.linkedinExpDetailScore || 0) < 8 ? "haute" : "moyenne",
+                    category: "💼 Expérience professionnelle",
+                    section: "experience",
+                    score: emp.linkedinExperienceScore || 0,
+                    maxScore: 25,
+                    subsections: [
+                        { name: "Détail", score: emp.linkedinExpDetailScore || 0, max: 15 },
+                        { name: "Progression", score: emp.linkedinProgressionScore || 0, max: 10 }
+                    ],
+                    actions: [
+                        "Détailler chaque poste avec missions et responsabilités",
+                        "Ajouter des résultats mesurables (%, €, volumes)",
+                        "Montrer la progression de carrière (évolutions, promotions)",
+                        "Éviter les descriptions vagues, privilégier l'impact business"
+                    ],
+                    examples: [
+                        "❌ 'Responsable de la gestion de portefeuille'",
+                        "✅ 'Gestion d'un portefeuille de 80 clients (50M€ AUM), +15% de collecte annuelle, NPS 72'"
+                    ]
+                });
+            }
+            
+            // 4. Compétences & Expertise
+            if ((emp.linkedinCompetenceScore || 0) < 14) {
+                recommendations.push({
+                    priority: (emp.linkedinValidationScore || 0) < 3 ? "moyenne" : "basse",
+                    category: "🛠️ Compétences & Validation sociale",
+                    section: "competence",
+                    score: emp.linkedinCompetenceScore || 0,
+                    maxScore: 20,
+                    subsections: [
+                        { name: "Compétences", score: emp.linkedinSkillsScore || 0, max: 10 },
+                        { name: "Recommandations", score: emp.linkedinValidationScore || 0, max: 10 }
+                    ],
+                    actions: [
+                        "Lister 5-10 compétences clés pertinentes et hiérarchisées",
+                        "Demander des recommandations écrites (objectif : 5+)",
+                        "Obtenir des validations de compétences par des pairs",
+                        "Supprimer les compétences génériques non différenciantes"
+                    ]
+                });
+            }
+            
+            // 5. Engagement & Visibilité
+            if ((emp.linkedinEngagementScore || 0) < 7) {
+                recommendations.push({
+                    priority: "basse",
+                    category: "📢 Engagement & Visibilité",
+                    section: "engagement",
+                    score: emp.linkedinEngagementScore || 0,
+                    maxScore: 10,
+                    subsections: [
+                        { name: "Activité", score: emp.linkedinActivityScore || 0, max: 5 },
+                        { name: "Réseau", score: emp.linkedinNetworkScore || 0, max: 5 }
+                    ],
+                    actions: [
+                        "Publier régulièrement du contenu professionnel",
+                        "Développer un réseau qualifié (500+ connexions ciblées)",
+                        "Interagir avec les publications de son secteur",
+                        "Rejoindre des groupes professionnels pertinents"
+                    ]
+                });
+            }
+            
+            // 6. Formation
+            if ((emp.linkedinFormationScore || 0) < 7) {
+                recommendations.push({
+                    priority: "basse",
+                    category: "🎓 Formation & Certifications",
+                    section: "formation",
+                    score: emp.linkedinFormationScore || 0,
+                    maxScore: 10,
+                    subsections: [
+                        { name: "Diplômes", score: emp.linkedinEducationScore || 0, max: 5 },
+                        { name: "Certifications", score: emp.linkedinCertScore || 0, max: 5 }
+                    ],
+                    actions: [
+                        "Renseigner les formations initiales avec détails",
+                        "Ajouter les certifications professionnelles actuelles",
+                        "Mentionner les formations continues récentes",
+                        "Inclure les MOOCs et spécialisations pertinentes"
+                    ]
+                });
+            }
+            
+            return recommendations.sort((a, b) => {
+                const priorityOrder = { haute: 0, moyenne: 1, basse: 2 };
+                return priorityOrder[a.priority] - priorityOrder[b.priority];
+            });
         }
         
         function getADNSynthesis(emp) {
@@ -1062,6 +1518,7 @@
             const avgLinkedInScore = state.employees.length > 0 ? Math.round(state.employees.reduce((sum, emp) => sum + (emp.linkedinGlobalScore || 0), 0) / state.employees.length) : 0;
             const avgSSIScore = state.employees.length > 0 ? Math.round(state.employees.reduce((sum, emp) => sum + (emp.ssiScore || 0), 0) / state.employees.length) : 0;
             const avgATSScore = state.employees.length > 0 ? Math.round(state.employees.reduce((sum, emp) => sum + (emp.atsScore || 0), 0) / state.employees.length) : 0;
+            const noGoCount = state.employees.filter(e => e.linkedinIsNoGo).length;
             
             let html = `<div class="space-y-4">
                 <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
@@ -1070,13 +1527,14 @@
                 </div>`;
             
             if (state.employees.length > 0) {
-                html += `<div class="grid grid-cols-6 gap-3">
-                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-blue-600">${state.employees.length}</p><p class="text-xs text-gray-600">Profils</p></div>
-                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-purple-600">${avgSSIScore}</p><p class="text-xs text-gray-600">SSI moy.</p></div>
-                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-indigo-600">${avgLinkedInScore}</p><p class="text-xs text-gray-600">LinkedIn</p></div>
-                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-green-600">${avgScore}</p><p class="text-xs text-gray-600">ADN moy.</p></div>
-                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-amber-600">${avgATSScore}</p><p class="text-xs text-gray-600">ATS moy.</p></div>
-                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-emerald-600">${state.employees.filter(e => (e.atsScore || 0) >= 65).length}</p><p class="text-xs text-gray-600">Shortlist</p></div>
+                html += `<div class="grid grid-cols-7 gap-2">
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-xl font-bold text-blue-600">${state.employees.length}</p><p class="text-xs text-gray-600">Profils</p></div>
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-xl font-bold text-purple-600">${avgSSIScore}</p><p class="text-xs text-gray-600">SSI</p></div>
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-xl font-bold text-cyan-600">${avgLinkedInScore}</p><p class="text-xs text-gray-600">LinkedIn Pro</p></div>
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-xl font-bold text-green-600">${avgScore}</p><p class="text-xs text-gray-600">ADN</p></div>
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-xl font-bold text-amber-600">${avgATSScore}</p><p class="text-xs text-gray-600">ATS</p></div>
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-xl font-bold text-emerald-600">${state.employees.filter(e => (e.atsScore || 0) >= 65).length}</p><p class="text-xs text-gray-600">Shortlist</p></div>
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center ${noGoCount > 0 ? 'bg-red-50' : ''}"><p class="text-xl font-bold ${noGoCount > 0 ? 'text-red-600' : 'text-gray-400'}">${noGoCount}</p><p class="text-xs text-gray-600">No-Go</p></div>
                 </div>`;
             }
             
@@ -1096,11 +1554,13 @@
                 const atsDecisionBadge = (emp.atsScore || 0) >= 80 ? 'bg-green-100 text-green-700' : 
                     (emp.atsScore || 0) >= 65 ? 'bg-yellow-100 text-yellow-700' : 
                     (emp.atsScore || 0) >= 40 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700';
-                html += `<div class="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                const linkedinNoGoBadge = emp.linkedinIsNoGo ? '<span class="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">⛔ NO-GO</span>' : '';
+                html += `<div class="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow ${emp.linkedinIsNoGo ? 'border-l-4 border-red-500' : ''}">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
                                 <h3 class="text-lg font-semibold text-gray-900">${emp.firstName} ${emp.lastName}</h3>
+                                ${linkedinNoGoBadge}
                                 ${emp.atsDecision ? '<span class="text-xs px-2 py-0.5 rounded ' + atsDecisionBadge + '">' + emp.atsDecision + '</span>' : ''}
                                 ${emp.email ? '<span class="text-sm">📧</span>' : ''}
                                 ${emp.linkedinUrl && isValidLinkedInURL(emp.linkedinUrl) ? '<span class="text-sm">🔗</span>' : ''}
@@ -1113,7 +1573,7 @@
                         </div>
                         <div class="flex gap-1">
                             <div class="text-center px-2"><div class="px-2 py-1 rounded-full text-xs font-semibold ${getScoreBadge(emp.ssiScore || 0)}">${emp.ssiScore || 0}</div><p class="text-xs text-gray-500 mt-1">SSI</p></div>
-                            <div class="text-center px-2"><div class="px-2 py-1 rounded-full text-xs font-semibold ${getScoreBadge(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}</div><p class="text-xs text-gray-500 mt-1">LinkedIn</p></div>
+                            <div class="text-center px-2"><div class="px-2 py-1 rounded-full text-xs font-semibold ${getScoreBadge(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}</div><p class="text-xs text-gray-500 mt-1">Pro</p></div>
                             <div class="text-center px-2"><div class="px-2 py-1 rounded-full text-xs font-semibold ${getScoreBadge(emp.globalScore)}">${emp.globalScore}</div><p class="text-xs text-gray-500 mt-1">ADN</p></div>
                             <div class="text-center px-2"><div class="px-2 py-1 rounded-full text-xs font-semibold ${getScoreBadge(emp.deptScore)}">${emp.deptScore}</div><p class="text-xs text-gray-500 mt-1">Métier</p></div>
                             <div class="text-center px-2"><div class="px-2 py-1 rounded-full text-xs font-semibold ${getScoreBadge(emp.atsScore || 0)}">${emp.atsScore || 0}</div><p class="text-xs text-gray-500 mt-1">ATS</p></div>
@@ -1172,7 +1632,7 @@
                     <h3 class="text-lg font-semibold mb-4">🏆 Scores globaux</h3>
                     <div class="grid grid-cols-5 gap-4">
                         <div><p class="text-sm text-gray-600 mb-2">📊 SSI</p><span class="text-3xl font-bold ${getScoreColor(emp.ssiScore || 0)}">${emp.ssiScore || 0}</span><span class="text-gray-500">/100</span></div>
-                        <div><p class="text-sm text-gray-600 mb-2">🔵 LinkedIn</p><span class="text-3xl font-bold ${getScoreColor(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}</span><span class="text-gray-500">/100</span></div>
+                        <div><p class="text-sm text-gray-600 mb-2">🔵 LinkedIn Pro</p><span class="text-3xl font-bold ${getScoreColor(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}</span><span class="text-gray-500">/100</span>${emp.linkedinIsNoGo ? '<p class="text-xs mt-1 text-red-600 font-semibold">⛔ NO-GO</p>' : '<p class="text-xs mt-1 text-gray-500">' + (emp.linkedinLevel || '') + '</p>'}</div>
                         <div><p class="text-sm text-gray-600 mb-2">🧬 ADN</p><span class="text-3xl font-bold ${getScoreColor(emp.globalScore)}">${emp.globalScore}</span><span class="text-gray-500">/100</span></div>
                         <div><p class="text-sm text-gray-600 mb-2">💼 Métier</p><span class="text-3xl font-bold ${getScoreColor(emp.deptScore)}">${emp.deptScore}</span><span class="text-gray-500">/100</span></div>
                         <div><p class="text-sm text-gray-600 mb-2">🎯 ATS</p><span class="text-3xl font-bold ${getScoreColor(emp.atsScore || 0)}">${emp.atsScore || 0}</span><span class="text-gray-500">/100</span><p class="text-xs mt-1 ${(emp.atsScore || 0) >= 65 ? 'text-green-600' : 'text-orange-600'}">${emp.atsDecision || ''}</p></div>
@@ -1233,6 +1693,95 @@
                     </div>` : '<div class="bg-green-50 p-4 rounded-lg border border-green-200"><p class="text-green-800">✅ Excellent ! Tous les facteurs SSI sont bien optimisés. Continuez à maintenir cette dynamique !</p></div>'}
                 </div>`;
             }
+            
+            // Section LinkedIn Pro
+            const linkedinSynthesis = getLinkedInProSynthesis(emp);
+            const linkedinRecos = getLinkedInProRecommendations(emp);
+            
+            html += `<div class="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 rounded-lg border border-blue-200">
+                <h3 class="text-lg font-semibold mb-4 text-blue-900">🔵 Évaluation LinkedIn Pro</h3>
+                
+                <!-- Synthèse LinkedIn Pro -->
+                <div class="bg-white p-4 rounded-lg mb-4 border-l-4 ${(emp.linkedinGlobalScore || 0) >= 70 ? 'border-green-500' : (emp.linkedinGlobalScore || 0) >= 50 ? 'border-yellow-500' : 'border-red-500'}">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="text-2xl font-bold ${getScoreColor(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}/100</span>
+                        <span class="px-3 py-1 rounded-full text-sm font-semibold ${(emp.linkedinGlobalScore || 0) >= 85 ? 'bg-green-100 text-green-700' : (emp.linkedinGlobalScore || 0) >= 70 ? 'bg-blue-100 text-blue-700' : (emp.linkedinGlobalScore || 0) >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}">${emp.linkedinLevel || ''}</span>
+                        <span class="text-gray-600">${emp.linkedinVerdict || ''}</span>
+                    </div>
+                    <p class="text-gray-700">${linkedinSynthesis.description}</p>
+                    ${linkedinSynthesis.isNoGo ? '<div class="mt-2 p-2 bg-red-100 rounded border border-red-300"><p class="text-red-800 font-semibold">⛔ Règles éliminatoires :</p><ul class="text-sm text-red-700 ml-4">' + linkedinSynthesis.noGoReasons.map(r => '<li class="list-disc">' + r + '</li>').join('') + '</ul></div>' : ''}
+                    ${(emp.linkedinFollowersCount || 0) > 0 || (emp.linkedinConnexionsCount || 0) > 0 ? '<div class="mt-2 flex gap-4 text-sm"><span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full">👥 ' + ((emp.linkedinConnexionsCount || 0) > 0 ? (emp.linkedinConnexionsCount || 0).toLocaleString('fr-FR') + ' relations' : 'Plus de 500 relations') + '</span>' + ((emp.linkedinFollowersCount || 0) > 0 ? '<span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full">📢 ' + (emp.linkedinFollowersCount || 0).toLocaleString('fr-FR') + ' abonnés</span>' : '') + '</div>' : ''}
+                    ${linkedinSynthesis.strengths.length > 0 ? '<p class="text-green-700 mt-2"><strong>✅ Points forts :</strong> ' + linkedinSynthesis.strengths.map(s => s.icon + ' ' + s.name).join(', ') + '</p>' : ''}
+                    ${linkedinSynthesis.weaknesses.length > 0 ? '<p class="text-orange-700 mt-1"><strong>⚠️ À améliorer :</strong> ' + linkedinSynthesis.weaknesses.map(w => w.icon + ' ' + w.name).join(', ') + '</p>' : ''}
+                </div>
+                
+                <!-- Les 6 sections LinkedIn Pro -->
+                <div class="bg-white p-4 rounded-lg mb-4">
+                    <p class="font-semibold mb-3">Analyse des 6 piliers professionnels</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="text-sm">👤 Identité & Crédibilité</span><span class="font-bold ${(emp.linkedinIdentityScore || 0) >= 12 ? 'text-green-600' : (emp.linkedinIdentityScore || 0) >= 8 ? 'text-yellow-600' : 'text-red-600'}">${emp.linkedinIdentityScore || 0}/15</span></div>
+                            <div class="w-full bg-gray-200 rounded-full h-2 mb-2"><div class="h-2 rounded-full bg-blue-500" style="width: ${((emp.linkedinIdentityScore || 0) / 15) * 100}%"></div></div>
+                            <p class="text-xs text-gray-500">Photo ${emp.linkedinPhotoScore || 0}/5 • Titre ${emp.linkedinHeadlineScore || 0}/5 • Localisation ${emp.linkedinLocationScore || 0}/5</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="text-sm">💡 Proposition de valeur</span><span class="font-bold ${(emp.linkedinPositioningScore || 0) >= 15 ? 'text-green-600' : (emp.linkedinPositioningScore || 0) >= 10 ? 'text-yellow-600' : 'text-red-600'}">${emp.linkedinPositioningScore || 0}/20</span></div>
+                            <div class="w-full bg-gray-200 rounded-full h-2 mb-2"><div class="h-2 rounded-full bg-purple-500" style="width: ${((emp.linkedinPositioningScore || 0) / 20) * 100}%"></div></div>
+                            <p class="text-xs text-gray-500">Résumé ${emp.linkedinSummaryScore || 0}/10 • Cohérence ${emp.linkedinCoherenceScore || 0}/10</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="text-sm">💼 Expérience professionnelle</span><span class="font-bold ${(emp.linkedinExperienceScore || 0) >= 18 ? 'text-green-600' : (emp.linkedinExperienceScore || 0) >= 12 ? 'text-yellow-600' : 'text-red-600'}">${emp.linkedinExperienceScore || 0}/25</span></div>
+                            <div class="w-full bg-gray-200 rounded-full h-2 mb-2"><div class="h-2 rounded-full bg-teal-500" style="width: ${((emp.linkedinExperienceScore || 0) / 25) * 100}%"></div></div>
+                            <p class="text-xs text-gray-500">Détail ${emp.linkedinExpDetailScore || 0}/15 • Progression ${emp.linkedinProgressionScore || 0}/10</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="text-sm">🛠️ Compétences & Expertise</span><span class="font-bold ${(emp.linkedinCompetenceScore || 0) >= 14 ? 'text-green-600' : (emp.linkedinCompetenceScore || 0) >= 8 ? 'text-yellow-600' : 'text-red-600'}">${emp.linkedinCompetenceScore || 0}/20</span></div>
+                            <div class="w-full bg-gray-200 rounded-full h-2 mb-2"><div class="h-2 rounded-full bg-amber-500" style="width: ${((emp.linkedinCompetenceScore || 0) / 20) * 100}%"></div></div>
+                            <p class="text-xs text-gray-500">Skills ${emp.linkedinSkillsScore || 0}/10 • Validation ${emp.linkedinValidationScore || 0}/10</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="text-sm">📢 Engagement & Visibilité</span><span class="font-bold ${(emp.linkedinEngagementScore || 0) >= 7 ? 'text-green-600' : (emp.linkedinEngagementScore || 0) >= 4 ? 'text-yellow-600' : 'text-red-600'}">${emp.linkedinEngagementScore || 0}/10</span></div>
+                            <div class="w-full bg-gray-200 rounded-full h-2 mb-2"><div class="h-2 rounded-full bg-indigo-500" style="width: ${((emp.linkedinEngagementScore || 0) / 10) * 100}%"></div></div>
+                            <p class="text-xs text-gray-500">Activité ${emp.linkedinActivityScore || 0}/5 • Réseau ${emp.linkedinNetworkScore || 0}/5</p>
+                            ${(emp.linkedinFollowersCount || 0) > 0 || (emp.linkedinConnexionsCount || 0) > 0 ? '<p class="text-xs text-blue-600 mt-1">📊 Détecté : ' + ((emp.linkedinFollowersCount || 0) > 0 ? (emp.linkedinFollowersCount || 0).toLocaleString('fr-FR') + ' abonnés' : '') + ((emp.linkedinFollowersCount || 0) > 0 && (emp.linkedinConnexionsCount || 0) > 0 ? ' • ' : '') + ((emp.linkedinConnexionsCount || 0) > 0 ? (emp.linkedinConnexionsCount || 0).toLocaleString('fr-FR') + ' relations' : '') + '</p>' : ''}
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="text-sm">🎓 Formation & Académique</span><span class="font-bold ${(emp.linkedinFormationScore || 0) >= 7 ? 'text-green-600' : (emp.linkedinFormationScore || 0) >= 4 ? 'text-yellow-600' : 'text-red-600'}">${emp.linkedinFormationScore || 0}/10</span></div>
+                            <div class="w-full bg-gray-200 rounded-full h-2 mb-2"><div class="h-2 rounded-full bg-pink-500" style="width: ${((emp.linkedinFormationScore || 0) / 10) * 100}%"></div></div>
+                            <p class="text-xs text-gray-500">Diplômes ${emp.linkedinEducationScore || 0}/5 • Certifications ${emp.linkedinCertScore || 0}/5</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Préconisations LinkedIn Pro -->
+                ${linkedinRecos.length > 0 ? `
+                <div class="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-lg border border-amber-200">
+                    <p class="font-semibold text-amber-900 mb-3">🎯 Plan d'optimisation LinkedIn</p>
+                    <div class="space-y-4">
+                        ${linkedinRecos.map(reco => `
+                            <div class="bg-white p-4 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center gap-2">
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium ${reco.priority === 'haute' ? 'bg-red-100 text-red-700' : reco.priority === 'moyenne' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}">${reco.priority === 'haute' ? '🔴 Priorité haute' : reco.priority === 'moyenne' ? '🟡 Priorité moyenne' : '⚪ Optionnel'}</span>
+                                        <span class="font-semibold text-gray-800">${reco.category}</span>
+                                    </div>
+                                    <span class="text-sm ${getScoreColor(Math.round((reco.score / reco.maxScore) * 100))}">${reco.score}/${reco.maxScore}</span>
+                                </div>
+                                <div class="flex gap-2 mb-2 text-xs text-gray-500">
+                                    ${reco.subsections.map(s => '<span class="px-2 py-0.5 bg-gray-100 rounded">' + s.name + ' ' + s.score + '/' + s.max + '</span>').join('')}
+                                </div>
+                                <ul class="text-sm text-gray-700 space-y-1 ml-4">
+                                    ${reco.actions.map(a => '<li class="list-disc">' + a + '</li>').join('')}
+                                </ul>
+                                ${reco.examples ? '<div class="bg-gray-50 p-2 rounded text-xs mt-2"><p class="text-gray-600 mb-1">Exemple :</p>' + reco.examples.map(e => '<p class="' + (e.startsWith('❌') ? 'text-red-600' : 'text-green-600') + '">' + e + '</p>').join('') + '</div>' : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>` : `
+                <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <p class="text-green-800">✅ Excellent profil LinkedIn ! Toutes les sections sont bien optimisées.</p>
+                </div>`}
+            </div>`;
             
             // ADN Scores
             const adnSynthesis = getADNSynthesis(emp);
@@ -1439,7 +1988,11 @@
             // Synthèse globale
             const avgScore = Math.round(((emp.ssiScore || 0) + (emp.linkedinGlobalScore || 0) + emp.globalScore + emp.deptScore + (emp.atsScore || 0)) / 5);
             let globalLevel, globalAdvice;
-            if (avgScore >= 65) {
+            
+            if (emp.linkedinIsNoGo) {
+                globalLevel = "⛔ Profil non exploitable";
+                globalAdvice = `Le profil de ${emp.firstName} présente des lacunes critiques (règles No-Go) qui doivent être corrigées en priorité avant toute autre optimisation.`;
+            } else if (avgScore >= 65) {
                 globalLevel = "🏆 Profil exemplaire";
                 globalAdvice = `${emp.firstName} dispose d'un profil LinkedIn optimisé et aligné avec Cyrus Herez. C'est un excellent ambassadeur de la marque. Maintenez cette dynamique avec une activité régulière.`;
             } else if (avgScore >= 45) {
@@ -1453,7 +2006,7 @@
                 globalAdvice = `Le profil de ${emp.firstName} est à reconstruire. Une formation complète aux bonnes pratiques LinkedIn est recommandée, suivie d'un accompagnement personnalisé.`;
             }
             
-            html += `<div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-lg text-white">
+            html += `<div class="bg-gradient-to-r ${emp.linkedinIsNoGo ? 'from-red-600 to-red-700' : 'from-blue-600 to-indigo-600'} p-6 rounded-lg text-white">
                 <h3 class="text-xl font-bold mb-3">📊 Synthèse globale</h3>
                 <div class="flex items-center gap-4 mb-4">
                     <div class="bg-white/20 rounded-lg p-4 text-center">
@@ -1467,7 +2020,7 @@
                 </div>
                 <div class="grid grid-cols-5 gap-2 text-center text-sm">
                     <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.ssiScore || 0}</p><p class="opacity-75">SSI</p></div>
-                    <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.linkedinGlobalScore || 0}</p><p class="opacity-75">LinkedIn</p></div>
+                    <div class="bg-white/10 rounded p-2 ${emp.linkedinIsNoGo ? 'ring-2 ring-white' : ''}"><p class="font-bold">${emp.linkedinGlobalScore || 0}</p><p class="opacity-75">Pro${emp.linkedinIsNoGo ? ' ⛔' : ''}</p></div>
                     <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.globalScore}</p><p class="opacity-75">ADN</p></div>
                     <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.deptScore}</p><p class="opacity-75">Métier</p></div>
                     <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.atsScore || 0}</p><p class="opacity-75">ATS</p></div>
