@@ -40,146 +40,206 @@
                 }
             ],
 departments: [
-    // Métiers patrimoniaux / financiers existants
+    // ========== PÔLE DIRECTION ==========
     {
         id: 1,
+        name: "Direction Générale",
+        keywords: ["direction générale","dg","ceo","président","directeur général","stratégie globale","vision","gouvernance","comex","comité exécutif","leadership","pilotage stratégique","croissance","transformation","développement"]
+    },
+    {
+        id: 2,
+        name: "Direction des Opérations",
+        keywords: ["direction opérations","coo","opérations","process","efficacité","organisation","optimisation","coordination","pilotage opérationnel","amélioration continue","lean","qualité","productivité"]
+    },
+    {
+        id: 3,
+        name: "Direction Financière",
+        keywords: ["direction financière","daf","cfo","finance","trésorerie","budget","comptabilité","reporting financier","consolidation","audit","contrôle","cash flow","investissement","rentabilité"]
+    },
+    {
+        id: 4,
+        name: "Direction du Développement",
+        keywords: ["direction développement","croissance","expansion","nouveaux marchés","partenariats stratégiques","m&a","acquisitions","diversification","innovation","business development","stratégie de croissance"]
+    },
+    {
+        id: 5,
+        name: "Secrétariat Général",
+        keywords: ["secrétariat général","secrétaire général","gouvernance","conseil administration","assemblée générale","compliance corporate","affaires juridiques","institutionnel","relations actionnaires"]
+    },
+
+    // ========== PÔLE RH & TALENTS ==========
+    {
+        id: 6,
+        name: "Direction des Ressources Humaines",
+        keywords: ["drh","direction rh","ressources humaines","stratégie rh","politique rh","capital humain","transformation rh","culture d'entreprise","engagement","marque employeur","organisation"]
+    },
+    {
+        id: 7,
+        name: "Recrutement & Talent Acquisition",
+        keywords: ["recrutement","talent acquisition","sourcing","chasse","entretiens","onboarding","intégration","candidats","offres d'emploi","cvthèque","linkedin recruiter","cooptation","assessment"]
+    },
+    {
+        id: 8,
+        name: "Formation & Développement des Compétences",
+        keywords: ["formation","développement compétences","learning","e-learning","parcours formation","plan de développement","coaching","mentoring","upskilling","reskilling","certification","académie"]
+    },
+    {
+        id: 9,
+        name: "Administration RH & Paie",
+        keywords: ["administration rh","paie","gestion administrative","contrats","bulletins","déclarations sociales","urssaf","congés","absences","sirh","temps de travail","mutuelle","prévoyance"]
+    },
+    {
+        id: 10,
+        name: "Relations Sociales & QVT",
+        keywords: ["relations sociales","cse","dialogue social","négociation","accords","qvt","qualité de vie","bien-être","prévention","rps","handicap","diversité","inclusion","rse sociale"]
+    },
+    {
+        id: 11,
+        name: "Gestion des Carrières & Mobilité",
+        keywords: ["gestion carrières","mobilité","évolution professionnelle","entretiens annuels","people review","talent management","hauts potentiels","succession","parcours","promotion","fidélisation"]
+    },
+
+    // ========== PÔLE SUPPORT & SERVICES GÉNÉRAUX ==========
+    {
+        id: 12,
+        name: "Support Administratif & Services Généraux",
+        keywords: ["services généraux","administratif","accueil","courrier","archivage","fournitures","locaux","maintenance","facilities","prestataires","logistique","moyens généraux","office management"]
+    },
+    {
+        id: 13,
+        name: "Support IT & Helpdesk",
+        keywords: ["support it","helpdesk","assistance technique","ticketing","incidents","dépannage","poste de travail","logiciels","matériel","réseau","vpn","support utilisateur","niveau 1","niveau 2"]
+    },
+    {
+        id: 14,
+        name: "Support Juridique & Contractuel",
+        keywords: ["support juridique","contrats","révision","négociation contractuelle","conformité","litiges","contentieux","veille juridique","rgpd","propriété intellectuelle","droit des affaires"]
+    },
+    {
+        id: 15,
+        name: "Assistanat de Direction",
+        keywords: ["assistante direction","assistant","secrétariat","agenda","réunions","organisation","déplacements","notes","comptes-rendus","coordination","filtrage","préparation","support exécutif"]
+    },
+
+    // ========== PÔLE COMMERCIAL & DÉVELOPPEMENT ==========
+    {
+        id: 16,
+        name: "Direction Commerciale",
+        keywords: ["direction commerciale","directeur commercial","stratégie commerciale","objectifs","budget commercial","pilotage ventes","animation équipe","forecast","pipeline","performance commerciale","kpi ventes"]
+    },
+    {
+        id: 17,
+        name: "Développement Commercial & Business Development",
+        keywords: ["développement commercial","business development","prospection","nouveaux clients","conquête","leads","opportunités","rdv","closing","négociation","proposition commerciale","devis"]
+    },
+    {
+        id: 18,
+        name: "Conseillers Commerciaux & Banquiers Privés",
+        keywords: ["conseiller commercial","banquier privé","banque privée","développement portefeuille","rdv clients","proposition de valeur","offre","présentation","argumentaire","prospection patrimoniale","souscription","signature"]
+    },
+    {
+        id: 19,
+        name: "Grands Comptes & Key Account Management",
+        keywords: ["grands comptes","key account","kam","comptes stratégiques","fidélisation","développement compte","upselling","cross selling","relation privilégiée","partenariat","contrats cadre"]
+    },
+    {
+        id: 20,
+        name: "Administration des Ventes & ADV",
+        keywords: ["adv","administration ventes","commandes","facturation","suivi","litiges commerciaux","sav","erp","crm","devis","contrats","relances","recouvrement"]
+    },
+    {
+        id: 21,
+        name: "Inside Sales & Téléprospection",
+        keywords: ["inside sales","téléprospection","phoning","qualification","prise de rdv","leads","appels sortants","script","argumentaire téléphonique","conversion","volume","cadence"]
+    },
+
+    // ========== PÔLE SERVICE CLIENT & RELATION ==========
+    {
+        id: 22,
+        name: "Service Client & Relation Clients",
+        keywords: ["service client","relation client","support client","satisfaction","fidélité","fidélisation","réclamation","écoute","suivi","qualité de service","sla","temps de réponse","accueil","hotline"]
+    },
+    {
+        id: 23,
+        name: "Middle-Office & Support Commercial",
+        keywords: ["middle office","support commercial","support aux ventes","traitement dossiers","entrée en relation","kyc","onboarding","suivi administratif","contrôle conformité","validation","processus"]
+    },
+    {
+        id: 24,
+        name: "Expérience Client & Customer Success",
+        keywords: ["expérience client","customer success","csm","accompagnement client","adoption","satisfaction","nps","churn","rétention","parcours client","feedback","amélioration continue"]
+    },
+
+    // ========== PÔLE MÉTIERS PATRIMONIAUX ==========
+    {
+        id: 25,
         name: "Conseil Patrimonial",
         keywords: ["conseil","patrimoine","patrimonial","stratégie","gestion","accompagnement","client","optimisation","transmission","ingénierie"]
     },
     {
-        id: 2,
+        id: 26,
         name: "Gestion Financière",
         keywords: ["finance","financier","marchés","investissement","allocation","performance","portefeuille","gestion","analyse","risque"]
     },
     {
-        id: 3,
+        id: 27,
         name: "Immobilier & Alternatifs",
-        keywords: ["immobilier","alternatif","investissement","placement","actif","diversification","rendement","loyer","baisse de volatilité","actifs réels"]
-    },
-    {
-        id: 4,
-        name: "Direction & Management",
-        keywords: ["direction","management","stratégie","développement","leadership","équipe","vision","transformation","pilotage","gouvernance"]
+        keywords: ["immobilier","alternatif","investissement","placement","actif","diversification","rendement","loyer","actifs réels","scpi","opci","private equity"]
     },
 
-    // *** PÔLE COMMERCIAL / DÉVELOPPEMENT ***
+    // ========== PÔLE MARKETING & COMMUNICATION ==========
     {
-        id: 5,
-        name: "Direction Commerciale & Développement",
-        keywords: [
-            "commercial","direction commerciale","développement commercial","business development",
-            "prospection","fidélisation","portefeuille clients","acquisition","cross selling",
-            "chiffre d'affaires","pipe commercial","opportunités","closing"
-        ]
-    },
-    {
-        id: 6,
-        name: "Conseillers Commerciaux & Banquiers Privés",
-        keywords: [
-            "conseiller commercial","banquier privé","banque privée","développement de portefeuille",
-            "rdv clients","proposition de valeur","offre","présentation","argumentaire",
-            "prospection patrimoniale","souscription","signature","closing"
-        ]
-    },
-
-    // *** RELATION / SERVICE CLIENT ***
-    {
-        id: 7,
-        name: "Service Client & Relation Clients",
-        keywords: [
-            "service client","relation client","relation clients","support client",
-            "satisfaction","fidélité","fidélisation","réclamation","écoute","suivi",
-            "qualité de service","SLA","temps de réponse","accueil","hotline"
-        ]
-    },
-    {
-        id: 8,
-        name: "Middle-Office & Support Commercial",
-        keywords: [
-            "middle office","support commercial","support aux ventes","traitement des dossiers",
-            "entrée en relation","KYC","onboarding","suivi administratif",
-            "contrôle de conformité","validation","processus"
-        ]
-    },
-
-    // *** MARKETING / COMMUNICATION ***
-    {
-        id: 9,
+        id: 28,
         name: "Marketing & Communication",
-        keywords: [
-            "marketing","communication","marque","branding","campagne","contenu",
-            "digital","réseaux sociaux","linkedin","événementiel","webinar",
-            "lead generation","nurturing","newsletter","plan de communication"
-        ]
+        keywords: ["marketing","communication","marque","branding","campagne","contenu","digital","réseaux sociaux","linkedin","événementiel","webinar","lead generation","nurturing","newsletter"]
     },
     {
-        id: 10,
+        id: 29,
         name: "Marketing Digital & Growth",
-        keywords: [
-            "marketing digital","growth","seo","sea","acquisition digitale",
-            "analytics","google analytics","taux de conversion","landing page",
-            "tracking","AB test","performance digitale","automation"
-        ]
+        keywords: ["marketing digital","growth","seo","sea","acquisition digitale","analytics","google analytics","taux conversion","landing page","tracking","ab test","performance digitale","automation"]
     },
 
-    // *** COMPLIANCE / RISQUES / JURIDIQUE ***
+    // ========== PÔLE CONFORMITÉ & RISQUES ==========
     {
-        id: 11,
+        id: 30,
         name: "Conformité & Contrôle Interne",
-        keywords: [
-            "conformité","compliance","contrôle interne","lcb ft","kyc",
-            "réglementaire","audit","risque","procédure","politique de conformité",
-            "amf","acpr","contrôle permanent","contrôle périodique"
-        ]
+        keywords: ["conformité","compliance","contrôle interne","lcb ft","kyc","réglementaire","audit","risque","procédure","politique conformité","amf","acpr","contrôle permanent","contrôle périodique"]
     },
     {
-        id: 12,
+        id: 31,
         name: "Juridique & Fiscalité",
-        keywords: [
-            "juridique","droit","fiscal","fiscalité","contrat","structuration",
-            "pacte d'associés","holding","transmission","donation","succession",
-            "optimisation fiscale","cadre juridique"
-        ]
+        keywords: ["juridique","droit","fiscal","fiscalité","contrat","structuration","pacte associés","holding","transmission","donation","succession","optimisation fiscale","cadre juridique"]
     },
 
-    // *** RESSOURCES HUMAINES / ORGANISATION ***
+    // ========== PÔLE FINANCE & CONTRÔLE ==========
     {
-        id: 13,
-        name: "Ressources Humaines & Talents",
-        keywords: [
-            "ressources humaines","rh","talent","recrutement","onboarding",
-            "formation","développement des compétences","gestion des talents",
-            "entretiens annuels","rémunération","politique RH","qvt","culture"
-        ]
+        id: 32,
+        name: "Comptabilité",
+        keywords: ["comptabilité","comptable","écritures","bilan","clôture","grand livre","fournisseurs","clients","trésorerie","rapprochement","normes comptables","audit"]
     },
     {
-        id: 14,
-        name: "Finance & Contrôle de Gestion",
-        keywords: [
-            "contrôle de gestion","contrôleur de gestion","reporting","budget",
-            "forecast","pilotage de la performance","indicateurs","kpi",
-            "analyse financière","marge","rentabilité","p&l"
-        ]
+        id: 33,
+        name: "Contrôle de Gestion",
+        keywords: ["contrôle gestion","contrôleur gestion","reporting","budget","forecast","pilotage performance","indicateurs","kpi","analyse financière","marge","rentabilité","p&l"]
     },
 
-    // *** IT / DATA / DIGITAL INTERNE ***
+    // ========== PÔLE IT & DATA ==========
     {
-        id: 15,
-        name: "IT, Systèmes d’Information & Data",
-        keywords: [
-            "it","systèmes d'information","informatique","data","donnée",
-            "reporting","bi","tableau de bord","crm","salesforce","power bi",
-            "sécurité","cybersécurité","processus digitaux","automatisation"
-        ]
+        id: 34,
+        name: "IT, Systèmes d'Information & Data",
+        keywords: ["it","systèmes information","informatique","data","donnée","reporting","bi","tableau de bord","crm","salesforce","power bi","sécurité","cybersécurité","processus digitaux","automatisation"]
     },
     {
-        id: 16,
+        id: 35,
+        name: "Développement & Projets IT",
+        keywords: ["développement","projets it","chef de projet","moa","moe","agile","scrum","intégration","api","architecture","infrastructure","cloud","devops","delivery"]
+    },
+
+    // ========== PÔLE OPÉRATIONS ==========
+    {
+        id: 36,
         name: "Back-Office & Opérations",
-        keywords: [
-            "back office","opérations","traitement","règlement livraison",
-            "opérations titres","flux","cash","process","contrôles","exécution",
-            "suivi administratif","reconciliations","settlement"
-        ]
+        keywords: ["back office","opérations","traitement","règlement livraison","opérations titres","flux","cash","process","contrôles","exécution","suivi administratif","reconciliations","settlement"]
     }
 ],
 
@@ -1040,7 +1100,58 @@ departments: [
             return html;
         }
 
+        // Grouper les départements par catégorie pour le formulaire
+        function getDepartmentGroups() {
+            return [
+                {
+                    label: "🏢 Direction",
+                    depts: ["Direction Générale", "Direction des Opérations", "Direction Financière", "Direction du Développement", "Secrétariat Général"]
+                },
+                {
+                    label: "👥 RH & Talents",
+                    depts: ["Direction des Ressources Humaines", "Recrutement & Talent Acquisition", "Formation & Développement des Compétences", "Administration RH & Paie", "Relations Sociales & QVT", "Gestion des Carrières & Mobilité"]
+                },
+                {
+                    label: "🛠️ Support & Services",
+                    depts: ["Support Administratif & Services Généraux", "Support IT & Helpdesk", "Support Juridique & Contractuel", "Assistanat de Direction"]
+                },
+                {
+                    label: "💼 Commercial & Développement",
+                    depts: ["Direction Commerciale", "Développement Commercial & Business Development", "Conseillers Commerciaux & Banquiers Privés", "Grands Comptes & Key Account Management", "Administration des Ventes & ADV", "Inside Sales & Téléprospection"]
+                },
+                {
+                    label: "🤝 Service Client",
+                    depts: ["Service Client & Relation Clients", "Middle-Office & Support Commercial", "Expérience Client & Customer Success"]
+                },
+                {
+                    label: "🏦 Métiers Patrimoniaux",
+                    depts: ["Conseil Patrimonial", "Gestion Financière", "Immobilier & Alternatifs"]
+                },
+                {
+                    label: "📣 Marketing & Communication",
+                    depts: ["Marketing & Communication", "Marketing Digital & Growth"]
+                },
+                {
+                    label: "⚖️ Conformité & Juridique",
+                    depts: ["Conformité & Contrôle Interne", "Juridique & Fiscalité"]
+                },
+                {
+                    label: "📊 Finance & Contrôle",
+                    depts: ["Comptabilité", "Contrôle de Gestion"]
+                },
+                {
+                    label: "💻 IT & Data",
+                    depts: ["IT, Systèmes d'Information & Data", "Développement & Projets IT"]
+                },
+                {
+                    label: "⚙️ Opérations",
+                    depts: ["Back-Office & Opérations"]
+                }
+            ];
+        }
+
         function renderAddForm() {
+            const groups = getDepartmentGroups();
             let html = '<div class="bg-white p-6 rounded-lg shadow-sm max-w-3xl mx-auto">' +
                 '<h2 class="text-xl font-bold mb-4">➕ Ajouter un collaborateur</h2>' +
                 '<form onsubmit="handleAddEmployee(event); return false;" class="space-y-4">' +
@@ -1050,8 +1161,16 @@ departments: [
                     '</div>' +
                     '<div><label class="block text-sm font-medium text-gray-700 mb-1">Poste</label><input type="text" id="position" class="w-full px-3 py-2 border rounded-lg" /></div>' +
                     '<div class="grid grid-cols-2 gap-4">' +
-                        '<div><label class="block text-sm font-medium text-gray-700 mb-1">Service</label><select id="department" class="w-full px-3 py-2 border rounded-lg"><option value="">Sélectionner</option>';
-            state.departments.forEach(dept => { html += '<option value="' + dept.name + '">' + dept.name + '</option>'; });
+                        '<div><label class="block text-sm font-medium text-gray-700 mb-1">Service</label><select id="department" class="w-full px-3 py-2 border rounded-lg"><option value="">Sélectionner un service...</option>';
+            
+            groups.forEach(group => {
+                html += '<optgroup label="' + group.label + '">';
+                group.depts.forEach(dept => {
+                    html += '<option value="' + dept + '">' + dept + '</option>';
+                });
+                html += '</optgroup>';
+            });
+            
             html += '</select></div>' +
                         '<div><label class="block text-sm font-medium text-gray-700 mb-1">Entreprise</label><input type="text" id="company" value="' + state.targetCompany + '" class="w-full px-3 py-2 border rounded-lg" /></div>' +
                     '</div>' +
