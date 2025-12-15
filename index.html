@@ -352,6 +352,293 @@
             return 'text-red-600';
         }
 
+        // ===== FONCTIONS DE SYNTHÈSE ET PRÉCONISATIONS =====
+        
+        function getSSISynthesis(emp) {
+            const score = emp.ssiScore || 0;
+            const brand = emp.ssiBrandScore || 0;
+            const people = emp.ssiPeopleScore || 0;
+            const engagement = emp.ssiEngagementScore || 0;
+            const relation = emp.ssiRelationScore || 0;
+            
+            let level, description;
+            if (score >= 75) {
+                level = "🏆 Excellent";
+                description = `${emp.firstName} fait partie des meilleurs profils du secteur avec un SSI de ${score}/100. Son personal branding est solide et son activité LinkedIn génère de l'engagement.`;
+            } else if (score >= 55) {
+                level = "✅ Bon";
+                description = `${emp.firstName} a un bon niveau d'activité sur LinkedIn avec un SSI de ${score}/100. Quelques optimisations permettraient d'atteindre l'excellence.`;
+            } else if (score >= 35) {
+                level = "⚠️ À développer";
+                description = `${emp.firstName} a un SSI de ${score}/100, inférieur à la moyenne du secteur. Un plan d'action ciblé est recommandé pour améliorer sa visibilité.`;
+            } else {
+                level = "🔴 Faible";
+                description = `${emp.firstName} a un SSI de ${score}/100, ce qui indique une présence LinkedIn à construire. Une formation aux fondamentaux serait bénéfique.`;
+            }
+            
+            // Identifier les points forts et faibles
+            const factors = [
+                { name: "Marque professionnelle", score: brand, icon: "🏆" },
+                { name: "Trouver les bonnes personnes", score: people, icon: "👥" },
+                { name: "Échanger des informations", score: engagement, icon: "💬" },
+                { name: "Établir des relations", score: relation, icon: "🤝" }
+            ];
+            
+            const strengths = factors.filter(f => f.score >= 18).sort((a, b) => b.score - a.score);
+            const weaknesses = factors.filter(f => f.score < 15).sort((a, b) => a.score - b.score);
+            
+            return { level, description, strengths, weaknesses };
+        }
+        
+        function getSSIRecommendations(emp) {
+            const recommendations = [];
+            const brand = emp.ssiBrandScore || 0;
+            const people = emp.ssiPeopleScore || 0;
+            const engagement = emp.ssiEngagementScore || 0;
+            const relation = emp.ssiRelationScore || 0;
+            
+            // Marque professionnelle
+            if (brand < 20) {
+                if (brand < 10) {
+                    recommendations.push({
+                        priority: "haute",
+                        category: "🏆 Marque professionnelle",
+                        actions: [
+                            "Compléter le titre avec des mots-clés métier (ex: 'Conseiller en Gestion de Patrimoine | Expert Transmission')",
+                            "Rédiger un résumé percutant de 3-4 paragraphes avec votre proposition de valeur",
+                            "Ajouter une photo professionnelle de qualité (fond neutre, sourire)",
+                            "Personnaliser la bannière avec les couleurs Cyrus Herez"
+                        ]
+                    });
+                } else {
+                    recommendations.push({
+                        priority: "moyenne",
+                        category: "🏆 Marque professionnelle",
+                        actions: [
+                            "Enrichir le résumé avec des réalisations chiffrées",
+                            "Ajouter des médias (présentations, articles, vidéos)",
+                            "Demander 3-5 recommandations à des clients ou partenaires"
+                        ]
+                    });
+                }
+            }
+            
+            // Trouver les bonnes personnes
+            if (people < 20) {
+                if (people < 10) {
+                    recommendations.push({
+                        priority: "haute",
+                        category: "👥 Développer son réseau",
+                        actions: [
+                            "Atteindre 500+ connexions pour plus de crédibilité",
+                            "Se connecter avec les décideurs du secteur patrimonial",
+                            "Rejoindre 5+ groupes LinkedIn pertinents (CGP, gestion de fortune, family office)",
+                            "Suivre les leaders d'opinion du secteur"
+                        ]
+                    });
+                } else {
+                    recommendations.push({
+                        priority: "moyenne",
+                        category: "👥 Développer son réseau",
+                        actions: [
+                            "Personnaliser les demandes de connexion",
+                            "Interagir régulièrement avec les posts de son réseau",
+                            "Identifier et suivre les prospects potentiels"
+                        ]
+                    });
+                }
+            }
+            
+            // Échanger des informations
+            if (engagement < 20) {
+                if (engagement < 10) {
+                    recommendations.push({
+                        priority: "haute",
+                        category: "💬 Partager du contenu",
+                        actions: [
+                            "Publier 1-2 posts par semaine sur des sujets patrimoniaux",
+                            "Commenter 3-5 publications par jour de manière pertinente",
+                            "Partager les actualités Cyrus Herez avec un commentaire personnel",
+                            "Relayer les articles de presse financière avec votre analyse"
+                        ]
+                    });
+                } else {
+                    recommendations.push({
+                        priority: "moyenne",
+                        category: "💬 Partager du contenu",
+                        actions: [
+                            "Varier les formats : texte, carousel, vidéo courte",
+                            "Créer du contenu éducatif (conseils fiscaux, tendances marchés)",
+                            "Taguer les personnes et entreprises mentionnées"
+                        ]
+                    });
+                }
+            }
+            
+            // Établir des relations
+            if (relation < 20) {
+                if (relation < 10) {
+                    recommendations.push({
+                        priority: "haute",
+                        category: "🤝 Construire des relations",
+                        actions: [
+                            "Répondre à tous les messages dans les 24h",
+                            "Féliciter son réseau pour les promotions/anniversaires",
+                            "Initier des conversations privées après des interactions publiques",
+                            "Proposer des rendez-vous téléphoniques ou cafés virtuels"
+                        ]
+                    });
+                } else {
+                    recommendations.push({
+                        priority: "moyenne",
+                        category: "🤝 Construire des relations",
+                        actions: [
+                            "Utiliser InMail pour les prospects stratégiques",
+                            "Organiser ou participer à des LinkedIn Live",
+                            "Créer des sondages pour engager son audience"
+                        ]
+                    });
+                }
+            }
+            
+            return recommendations;
+        }
+        
+        function getADNSynthesis(emp) {
+            const score = emp.globalScore;
+            const strongAxes = emp.axisScores.filter(a => a.score >= 60);
+            const weakAxes = emp.axisScores.filter(a => a.score < 40);
+            
+            let level, description;
+            if (score >= 70) {
+                level = "🏆 Excellent alignement";
+                description = `Le profil de ${emp.firstName} reflète parfaitement les valeurs et le positionnement de Cyrus Herez. C'est un excellent ambassadeur de la marque employeur.`;
+            } else if (score >= 50) {
+                level = "✅ Bon alignement";
+                description = `${emp.firstName} incarne correctement l'ADN de Cyrus Herez. Quelques ajustements de vocabulaire renforceraient l'alignement.`;
+            } else if (score >= 30) {
+                level = "⚠️ Alignement partiel";
+                description = `Le profil de ${emp.firstName} n'utilise pas suffisamment le vocabulaire distinctif de Cyrus Herez. Un travail sur le wording est conseillé.`;
+            } else {
+                level = "🔴 Faible alignement";
+                description = `Le profil de ${emp.firstName} ne reflète pas l'identité de Cyrus Herez. Une réécriture guidée du profil est recommandée.`;
+            }
+            
+            return { level, description, strongAxes, weakAxes };
+        }
+        
+        function getADNRecommendations(emp) {
+            const recommendations = [];
+            
+            emp.axisScores.forEach(axis => {
+                if (axis.score < 50 && axis.missingKeywords.length > 0) {
+                    const priority = axis.score < 25 ? "haute" : "moyenne";
+                    const keywordsToAdd = axis.missingKeywords.slice(0, 5);
+                    
+                    let contextualAdvice = "";
+                    if (axis.axisName.includes("Excellence")) {
+                        contextualAdvice = "Mettez en avant votre expertise technique et vos certifications.";
+                    } else if (axis.axisName.includes("Indépendance")) {
+                        contextualAdvice = "Soulignez votre objectivité et votre approche éthique.";
+                    } else if (axis.axisName.includes("sur-mesure")) {
+                        contextualAdvice = "Insistez sur la personnalisation et l'écoute client.";
+                    } else if (axis.axisName.includes("long-terme")) {
+                        contextualAdvice = "Évoquez la pérennité et l'accompagnement dans la durée.";
+                    }
+                    
+                    recommendations.push({
+                        priority: priority,
+                        category: "🧬 " + axis.axisName,
+                        score: axis.score,
+                        advice: contextualAdvice,
+                        keywords: keywordsToAdd
+                    });
+                }
+            });
+            
+            return recommendations.sort((a, b) => a.score - b.score);
+        }
+        
+        function getMetierSynthesis(emp) {
+            const score = emp.deptScore;
+            const found = emp.deptFoundKeywords?.length || 0;
+            const total = emp.deptTotalKeywords || 1;
+            
+            let level, description;
+            if (score >= 60) {
+                level = "🏆 Très bon positionnement";
+                description = `Le profil de ${emp.firstName} utilise ${found} mots-clés sur ${total} du référentiel "${emp.department}". Le positionnement métier est clair et bien articulé.`;
+            } else if (score >= 40) {
+                level = "✅ Bon positionnement";
+                description = `${emp.firstName} couvre ${found}/${total} termes du référentiel métier. L'ajout de quelques mots-clés spécifiques renforcerait la visibilité dans les recherches.`;
+            } else if (score >= 20) {
+                level = "⚠️ Positionnement partiel";
+                description = `Avec ${found}/${total} mots-clés, le profil de ${emp.firstName} manque de terminologie spécifique au métier. Il risque de passer sous le radar des recruteurs et prospects.`;
+            } else {
+                level = "🔴 Positionnement faible";
+                description = `Le profil de ${emp.firstName} ne contient que ${found}/${total} termes métier. Une optimisation complète est nécessaire pour le référencement.`;
+            }
+            
+            return { level, description, found, total };
+        }
+        
+        function getMetierRecommendations(emp) {
+            if (!emp.deptMissingKeywords || emp.deptMissingKeywords.length === 0) return [];
+            
+            // Grouper les mots-clés manquants par catégorie
+            const missing = emp.deptMissingKeywords;
+            
+            // Identifier les types de mots-clés manquants
+            const titres = missing.filter(k => 
+                k.includes('directeur') || k.includes('responsable') || k.includes('manager') || 
+                k.includes('chef') || k.includes('head') || k.includes('ceo') || k.includes('cfo')
+            ).slice(0, 3);
+            
+            const competences = missing.filter(k => 
+                !titres.includes(k) && (
+                    k.includes('gestion') || k.includes('analyse') || k.includes('stratég') ||
+                    k.includes('conseil') || k.includes('développement') || k.includes('pilotage')
+                )
+            ).slice(0, 5);
+            
+            const outils = missing.filter(k => 
+                k.includes('crm') || k.includes('erp') || k.includes('excel') || k.includes('power bi') ||
+                k.includes('salesforce') || k.includes('sap') || k.includes('hubspot')
+            ).slice(0, 3);
+            
+            const autres = missing.filter(k => 
+                !titres.includes(k) && !competences.includes(k) && !outils.includes(k)
+            ).slice(0, 5);
+            
+            const recommendations = [];
+            
+            if (competences.length > 0) {
+                recommendations.push({
+                    category: "💡 Compétences clés à mentionner",
+                    keywords: competences,
+                    tip: "Intégrez ces termes dans votre résumé et descriptions d'expériences."
+                });
+            }
+            
+            if (outils.length > 0) {
+                recommendations.push({
+                    category: "🛠️ Outils & Technologies",
+                    keywords: outils,
+                    tip: "Ajoutez ces outils dans la section Compétences de LinkedIn."
+                });
+            }
+            
+            if (autres.length > 0) {
+                recommendations.push({
+                    category: "📌 Autres termes métier",
+                    keywords: autres,
+                    tip: "Utilisez ces termes naturellement dans vos descriptions."
+                });
+            }
+            
+            return recommendations;
+        }
+
         function handleAddEmployee(event) {
             event.preventDefault();
             const profileText = document.getElementById('profileText').value;
@@ -465,11 +752,10 @@
                     <h3 class="text-lg font-semibold text-gray-900 mb-2">Aucun profil analysé</h3>
                     <p class="text-gray-600 mb-4">Commencez par ajouter un profil LinkedIn</p>
                     <div class="text-sm text-gray-500 max-w-md mx-auto bg-blue-50 p-4 rounded-lg">
-                        <p class="font-medium mb-2">💡 3 façons d'ajouter un profil :</p>
+                        <p class="font-medium mb-2">💡 2 façons d'ajouter un profil :</p>
                         <div class="text-left space-y-2">
-                            <p><strong>⚡ Coller le texte</strong> - Copiez tout depuis LinkedIn</p>
-                            <p><strong>📄 Importer un fichier</strong> - PDF ou capture d'écran</p>
-                            <p><strong>➕ Saisie manuelle</strong> - Formulaire complet</p>
+                            <p><strong>⚡ Coller le texte</strong> - Copiez tout depuis LinkedIn (recommandé)</p>
+                            <p><strong>➕ Saisie manuelle</strong> - Formulaire complet avec tous les champs</p>
                         </div>
                     </div>
                 </div>`;
@@ -482,26 +768,22 @@
         function renderEmployeeDetail() {
             const emp = state.selectedEmployee;
             if (!emp) return '';
-            const importBadge = emp.importedFrom === 'file' ? '<span class="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-full ml-3">📄 Importé</span>' : '';
             const strongAxes = emp.axisScores.filter(axis => axis.score >= 60);
             const weakAxes = emp.axisScores.filter(axis => axis.score < 60);
             
             let html = `<div class="space-y-6">
-                <button onclick="state.currentView = 'list'; render();" class="text-blue-600 hover:text-blue-700 font-medium">← Retour</button>
+                <button onclick="state.currentView = 'list'; render();" class="text-blue-600 hover:text-blue-700 font-medium">← Retour à la liste</button>
                 
                 <div class="bg-white p-6 rounded-lg shadow-sm">
                     <div class="flex items-start justify-between mb-4">
                         <div>
-                            <div class="flex items-center gap-3 mb-2">
-                                <h2 class="text-3xl font-bold text-gray-900">${emp.firstName} ${emp.lastName}</h2>
-                                ${importBadge}
-                            </div>
+                            <h2 class="text-3xl font-bold text-gray-900 mb-2">${emp.firstName} ${emp.lastName}</h2>
                             <p class="text-lg text-gray-600">${emp.position}</p>
                             <p class="text-gray-500">${emp.department} • ${emp.company}</p>
                         </div>
-                        <button onclick="deleteEmployee(${emp.id})" class="p-2 text-red-600 hover:bg-red-50 rounded">🗑️</button>
+                        <button onclick="deleteEmployee(${emp.id})" class="p-2 text-red-600 hover:bg-red-50 rounded" title="Supprimer">🗑️</button>
                     </div>
-                    ${emp.linkedinUrl ? '<a href="' + emp.linkedinUrl + '" target="_blank" class="text-blue-600 hover:underline text-sm">🔗 Voir sur LinkedIn</a>' : ''}
+                    ${emp.linkedinUrl ? '<a href="' + emp.linkedinUrl + '" target="_blank" class="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm bg-blue-50 px-3 py-1 rounded-full">🔗 Voir le profil LinkedIn</a>' : ''}
                 </div>
                 
                 <div class="bg-white p-6 rounded-lg shadow-sm">
@@ -516,55 +798,213 @@
             
             // SSI Details
             if (emp.ssiScore !== undefined) {
+                const ssiSynthesis = getSSISynthesis(emp);
+                const ssiRecos = getSSIRecommendations(emp);
+                
                 html += `<div class="bg-gradient-to-r from-indigo-50 to-blue-50 p-6 rounded-lg border border-indigo-200">
                     <h3 class="text-lg font-semibold mb-4 text-indigo-900">📊 Social Selling Index (SSI)</h3>
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div class="bg-white p-4 rounded-lg"><p class="text-xs text-gray-600">Classement Secteur</p><p class="text-2xl font-bold text-indigo-600">Top ${emp.ssiSectorRanking}%</p></div>
-                        <div class="bg-white p-4 rounded-lg"><p class="text-xs text-gray-600">Classement Réseau</p><p class="text-2xl font-bold text-blue-600">Top ${emp.ssiNetworkRanking}%</p></div>
+                    
+                    <!-- Synthèse -->
+                    <div class="bg-white p-4 rounded-lg mb-4 border-l-4 ${emp.ssiScore >= 55 ? 'border-green-500' : emp.ssiScore >= 35 ? 'border-yellow-500' : 'border-red-500'}">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="font-bold text-lg">${ssiSynthesis.level}</span>
+                            <span class="text-2xl font-bold ${getScoreColor(emp.ssiScore)}">${emp.ssiScore}/100</span>
+                        </div>
+                        <p class="text-gray-700">${ssiSynthesis.description}</p>
+                        ${ssiSynthesis.strengths.length > 0 ? '<p class="text-green-700 mt-2"><strong>Points forts :</strong> ' + ssiSynthesis.strengths.map(s => s.icon + ' ' + s.name).join(', ') + '</p>' : ''}
+                        ${ssiSynthesis.weaknesses.length > 0 ? '<p class="text-orange-700 mt-1"><strong>À améliorer :</strong> ' + ssiSynthesis.weaknesses.map(w => w.icon + ' ' + w.name).join(', ') + '</p>' : ''}
                     </div>
-                    <div class="bg-white p-4 rounded-lg">
-                        <p class="font-semibold mb-3">Les quatre facteurs</p>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="bg-white p-4 rounded-lg"><p class="text-xs text-gray-600">Classement Secteur</p><p class="text-2xl font-bold text-indigo-600">Top ${emp.ssiSectorRanking}%</p><p class="text-xs text-gray-500">Moyenne secteur : ${emp.ssiAvgSectorScore}</p></div>
+                        <div class="bg-white p-4 rounded-lg"><p class="text-xs text-gray-600">Classement Réseau</p><p class="text-2xl font-bold text-blue-600">Top ${emp.ssiNetworkRanking}%</p><p class="text-xs text-gray-500">Moyenne réseau : ${emp.ssiAvgNetworkScore}</p></div>
+                    </div>
+                    
+                    <div class="bg-white p-4 rounded-lg mb-4">
+                        <p class="font-semibold mb-3">Les quatre facteurs SSI</p>
                         <div class="space-y-3">
-                            <div><div class="flex justify-between mb-1"><span class="text-sm">🏆 Marque professionnelle</span><span class="font-bold">${emp.ssiBrandScore}/25</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-orange-500" style="width: ${emp.ssiBrandScore * 4}%"></div></div></div>
-                            <div><div class="flex justify-between mb-1"><span class="text-sm">👥 Bonnes personnes</span><span class="font-bold">${emp.ssiPeopleScore}/25</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-blue-500" style="width: ${emp.ssiPeopleScore * 4}%"></div></div></div>
-                            <div><div class="flex justify-between mb-1"><span class="text-sm">💬 Échanger informations</span><span class="font-bold">${emp.ssiEngagementScore}/25</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-purple-500" style="width: ${emp.ssiEngagementScore * 4}%"></div></div></div>
-                            <div><div class="flex justify-between mb-1"><span class="text-sm">🤝 Établir relations</span><span class="font-bold">${emp.ssiRelationScore}/25</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-green-500" style="width: ${emp.ssiRelationScore * 4}%"></div></div></div>
+                            <div><div class="flex justify-between mb-1"><span class="text-sm">🏆 Marque professionnelle</span><span class="font-bold ${emp.ssiBrandScore >= 18 ? 'text-green-600' : emp.ssiBrandScore >= 12 ? 'text-yellow-600' : 'text-red-600'}">${emp.ssiBrandScore}/25</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-orange-500" style="width: ${emp.ssiBrandScore * 4}%"></div></div></div>
+                            <div><div class="flex justify-between mb-1"><span class="text-sm">👥 Trouver les bonnes personnes</span><span class="font-bold ${emp.ssiPeopleScore >= 18 ? 'text-green-600' : emp.ssiPeopleScore >= 12 ? 'text-yellow-600' : 'text-red-600'}">${emp.ssiPeopleScore}/25</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-blue-500" style="width: ${emp.ssiPeopleScore * 4}%"></div></div></div>
+                            <div><div class="flex justify-between mb-1"><span class="text-sm">💬 Échanger des informations</span><span class="font-bold ${emp.ssiEngagementScore >= 18 ? 'text-green-600' : emp.ssiEngagementScore >= 12 ? 'text-yellow-600' : 'text-red-600'}">${emp.ssiEngagementScore}/25</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-purple-500" style="width: ${emp.ssiEngagementScore * 4}%"></div></div></div>
+                            <div><div class="flex justify-between mb-1"><span class="text-sm">🤝 Établir des relations</span><span class="font-bold ${emp.ssiRelationScore >= 18 ? 'text-green-600' : emp.ssiRelationScore >= 12 ? 'text-yellow-600' : 'text-red-600'}">${emp.ssiRelationScore}/25</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-green-500" style="width: ${emp.ssiRelationScore * 4}%"></div></div></div>
                         </div>
                     </div>
+                    
+                    <!-- Préconisations SSI -->
+                    ${ssiRecos.length > 0 ? `
+                    <div class="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-lg border border-amber-200">
+                        <p class="font-semibold text-amber-900 mb-3">🎯 Plan d'action SSI</p>
+                        <div class="space-y-4">
+                            ${ssiRecos.map(reco => `
+                                <div class="bg-white p-3 rounded-lg">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium ${reco.priority === 'haute' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">${reco.priority === 'haute' ? '🔴 Priorité haute' : '🟡 Priorité moyenne'}</span>
+                                        <span class="font-semibold text-gray-800">${reco.category}</span>
+                                    </div>
+                                    <ul class="text-sm text-gray-700 space-y-1 ml-4">
+                                        ${reco.actions.map(a => '<li class="list-disc">' + a + '</li>').join('')}
+                                    </ul>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>` : '<div class="bg-green-50 p-4 rounded-lg border border-green-200"><p class="text-green-800">✅ Excellent ! Tous les facteurs SSI sont bien optimisés. Continuez à maintenir cette dynamique !</p></div>'}
                 </div>`;
             }
             
             // ADN Scores
+            const adnSynthesis = getADNSynthesis(emp);
+            const adnRecos = getADNRecommendations(emp);
+            
             html += `<div class="bg-white p-6 rounded-lg shadow-sm">
-                <h3 class="text-lg font-semibold mb-4">🧬 Scores ADN</h3>
-                <div class="space-y-4">`;
+                <h3 class="text-lg font-semibold mb-4">🧬 Alignement ADN Cyrus Herez</h3>
+                
+                <!-- Synthèse ADN -->
+                <div class="bg-gradient-to-r ${emp.globalScore >= 50 ? 'from-green-50 to-emerald-50 border-green-200' : emp.globalScore >= 30 ? 'from-yellow-50 to-amber-50 border-yellow-200' : 'from-red-50 to-orange-50 border-red-200'} p-4 rounded-lg mb-4 border">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="font-bold text-lg">${adnSynthesis.level}</span>
+                        <span class="text-2xl font-bold ${getScoreColor(emp.globalScore)}">${emp.globalScore}/100</span>
+                    </div>
+                    <p class="text-gray-700">${adnSynthesis.description}</p>
+                </div>
+                
+                <!-- Détail des axes -->
+                <div class="space-y-4 mb-4">`;
+            
             emp.axisScores.forEach(axis => {
                 const barColor = axis.score >= 70 ? 'bg-green-500' : axis.score >= 40 ? 'bg-yellow-500' : 'bg-red-500';
-                html += `<div>
+                const bgColor = axis.score >= 70 ? 'bg-green-50' : axis.score >= 40 ? 'bg-yellow-50' : 'bg-red-50';
+                html += `<div class="${bgColor} p-4 rounded-lg">
                     <div class="flex justify-between mb-2"><span class="font-medium">${axis.axisName}</span><span class="font-semibold ${getScoreColor(axis.score)}">${axis.score}/100</span></div>
-                    <div class="w-full bg-gray-200 rounded-full h-3"><div class="h-3 rounded-full ${barColor}" style="width: ${axis.score}%"></div></div>
-                    ${axis.foundKeywords.length > 0 ? '<p class="text-sm text-gray-600 mt-1">✓ ' + axis.foundKeywords.join(', ') + '</p>' : ''}
+                    <div class="w-full bg-gray-200 rounded-full h-3 mb-2"><div class="h-3 rounded-full ${barColor}" style="width: ${axis.score}%"></div></div>
+                    ${axis.foundKeywords.length > 0 ? '<p class="text-sm text-green-700"><strong>✓ Présents :</strong> ' + axis.foundKeywords.slice(0, 8).join(', ') + (axis.foundKeywords.length > 8 ? '...' : '') + '</p>' : '<p class="text-sm text-gray-500 italic">Aucun mot-clé détecté</p>'}
                 </div>`;
             });
-            html += '</div></div>';
             
-            // Métier
-            if (emp.department) {
-                html += `<div class="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg border border-purple-200">
-                    <h3 class="text-lg font-semibold mb-4 text-purple-900">💼 Score Métier - ${emp.department}</h3>
-                    <div class="bg-white p-4 rounded-lg mb-4">
-                        <div class="flex justify-between mb-3"><span>Score global</span><span class="text-2xl font-bold ${getScoreColor(emp.deptScore)}">${emp.deptScore}/100</span></div>
-                        <div class="w-full bg-gray-200 rounded-full h-3"><div class="h-3 rounded-full ${emp.deptScore >= 70 ? 'bg-green-500' : emp.deptScore >= 40 ? 'bg-yellow-500' : 'bg-red-500'}" style="width: ${emp.deptScore}%"></div></div>
+            html += '</div>';
+            
+            // Préconisations ADN
+            if (adnRecos.length > 0) {
+                html += `<div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+                    <p class="font-semibold text-blue-900 mb-3">🎯 Recommandations pour renforcer l'ADN</p>
+                    <div class="space-y-3">
+                        ${adnRecos.map(reco => `
+                            <div class="bg-white p-3 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-semibold text-gray-800">${reco.category}</span>
+                                    <span class="text-sm ${getScoreColor(reco.score)}">${reco.score}/100</span>
+                                </div>
+                                <p class="text-sm text-gray-600 mb-2">${reco.advice}</p>
+                                <div class="flex flex-wrap gap-1">
+                                    ${reco.keywords.map(k => '<span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">+ ' + k + '</span>').join('')}
+                                </div>
+                            </div>
+                        `).join('')}
                     </div>
-                    ${emp.deptFoundKeywords?.length > 0 ? '<div class="bg-green-50 p-4 rounded-lg mb-4"><p class="font-semibold text-green-900 mb-2">✅ Présents</p><div class="flex flex-wrap gap-2">' + emp.deptFoundKeywords.map(kw => '<span class="px-3 py-1 bg-green-200 text-green-800 rounded-full text-sm">' + kw + '</span>').join('') + '</div></div>' : ''}
-                    ${emp.deptMissingKeywords?.length > 0 ? '<div class="bg-orange-50 p-4 rounded-lg"><p class="font-semibold text-orange-900 mb-2">⚠️ À intégrer</p><div class="flex flex-wrap gap-2">' + emp.deptMissingKeywords.slice(0, 10).map(kw => '<span class="px-3 py-1 bg-orange-200 text-orange-800 rounded-full text-sm">' + kw + '</span>').join('') + '</div></div>' : ''}
+                    <p class="text-sm text-blue-700 mt-3 italic">💡 Conseil : Intégrez ces mots-clés naturellement dans votre résumé, vos expériences et votre titre LinkedIn.</p>
+                </div>`;
+            } else {
+                html += `<div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <p class="text-green-800">✅ Excellent alignement ! Le profil reflète parfaitement les valeurs de Cyrus Herez.</p>
                 </div>`;
             }
             
-            html += `<div class="bg-blue-50 p-6 rounded-lg border border-blue-200">
-                <h3 class="text-lg font-semibold mb-2 text-blue-900">📊 Synthèse</h3>
-                <p class="text-blue-800">${emp.globalScore >= 70 ? 'Profil fortement aligné avec l\'ADN.' : emp.globalScore >= 40 ? 'Profil moyennement aligné.' : 'Faible alignement avec l\'ADN.'}</p>
-                <p class="text-sm text-blue-700 mt-2">📝 ${emp.wordCount} mots analysés</p>
+            html += '</div>';
+            
+            // Métier
+            if (emp.department) {
+                const metierSynthesis = getMetierSynthesis(emp);
+                const metierRecos = getMetierRecommendations(emp);
+                
+                html += `<div class="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg border border-purple-200">
+                    <h3 class="text-lg font-semibold mb-4 text-purple-900">💼 Score Métier - ${emp.department}</h3>
+                    
+                    <!-- Synthèse Métier -->
+                    <div class="bg-white p-4 rounded-lg mb-4 border-l-4 ${emp.deptScore >= 60 ? 'border-green-500' : emp.deptScore >= 40 ? 'border-yellow-500' : 'border-red-500'}">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="font-bold text-lg">${metierSynthesis.level}</span>
+                            <span class="text-2xl font-bold ${getScoreColor(emp.deptScore)}">${emp.deptScore}/100</span>
+                        </div>
+                        <p class="text-gray-700">${metierSynthesis.description}</p>
+                        <p class="text-sm text-gray-500 mt-2">📊 Couverture : ${metierSynthesis.found} mots-clés sur ${metierSynthesis.total} du référentiel métier</p>
+                    </div>
+                    
+                    <!-- Mots-clés présents -->
+                    ${emp.deptFoundKeywords?.length > 0 ? `
+                    <div class="bg-green-50 p-4 rounded-lg mb-4 border border-green-200">
+                        <p class="font-semibold text-green-900 mb-2">✅ Mots-clés présents (${emp.deptFoundKeywords.length})</p>
+                        <div class="flex flex-wrap gap-2">
+                            ${emp.deptFoundKeywords.map(kw => '<span class="px-3 py-1 bg-green-200 text-green-800 rounded-full text-sm">' + kw + '</span>').join('')}
+                        </div>
+                    </div>` : ''}
+                    
+                    <!-- Préconisations Métier -->
+                    ${metierRecos.length > 0 ? `
+                    <div class="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-lg border border-amber-200">
+                        <p class="font-semibold text-amber-900 mb-3">🎯 Mots-clés à intégrer pour améliorer le référencement</p>
+                        <div class="space-y-4">
+                            ${metierRecos.map(reco => `
+                                <div class="bg-white p-3 rounded-lg">
+                                    <p class="font-semibold text-gray-800 mb-2">${reco.category}</p>
+                                    <div class="flex flex-wrap gap-2 mb-2">
+                                        ${reco.keywords.map(k => '<span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm border border-orange-300">+ ' + k + '</span>').join('')}
+                                    </div>
+                                    <p class="text-xs text-gray-600 italic">${reco.tip}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                        
+                        <div class="mt-4 p-3 bg-white rounded-lg border border-purple-200">
+                            <p class="font-medium text-purple-900 mb-2">📝 Comment intégrer ces mots-clés ?</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• <strong>Titre LinkedIn :</strong> Ajoutez 2-3 termes clés de votre expertise</li>
+                                <li>• <strong>Résumé :</strong> Décrivez vos compétences avec le vocabulaire métier</li>
+                                <li>• <strong>Expériences :</strong> Utilisez les termes pour décrire vos missions</li>
+                                <li>• <strong>Compétences :</strong> Ajoutez les termes pertinents dans cette section</li>
+                            </ul>
+                        </div>
+                    </div>` : `
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <p class="text-green-800">✅ Excellent positionnement ! Le profil utilise efficacement le vocabulaire métier du référentiel "${emp.department}".</p>
+                    </div>`}
+                </div>`;
+            }
+            
+            // Synthèse globale
+            const avgScore = Math.round((emp.ssiScore + emp.linkedinGlobalScore + emp.globalScore + emp.deptScore) / 4);
+            let globalLevel, globalAdvice;
+            if (avgScore >= 65) {
+                globalLevel = "🏆 Profil exemplaire";
+                globalAdvice = `${emp.firstName} dispose d'un profil LinkedIn optimisé et aligné avec Cyrus Herez. C'est un excellent ambassadeur de la marque. Maintenez cette dynamique avec une activité régulière.`;
+            } else if (avgScore >= 45) {
+                globalLevel = "✅ Bon profil";
+                globalAdvice = `${emp.firstName} a un bon profil avec des axes d'amélioration identifiés. En appliquant les recommandations ci-dessus, le profil peut rapidement atteindre l'excellence.`;
+            } else if (avgScore >= 30) {
+                globalLevel = "⚠️ Profil à développer";
+                globalAdvice = `Le profil de ${emp.firstName} nécessite un travail d'optimisation. Nous recommandons une session de coaching LinkedIn personnalisée pour traiter les points prioritaires.`;
+            } else {
+                globalLevel = "🔴 Profil à construire";
+                globalAdvice = `Le profil de ${emp.firstName} est à reconstruire. Une formation complète aux bonnes pratiques LinkedIn est recommandée, suivie d'un accompagnement personnalisé.`;
+            }
+            
+            html += `<div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-lg text-white">
+                <h3 class="text-xl font-bold mb-3">📊 Synthèse globale</h3>
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="bg-white/20 rounded-lg p-4 text-center">
+                        <p class="text-4xl font-bold">${avgScore}</p>
+                        <p class="text-sm opacity-90">Score moyen</p>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-lg font-semibold mb-1">${globalLevel}</p>
+                        <p class="opacity-90">${globalAdvice}</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-center text-sm">
+                    <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.ssiScore}</p><p class="opacity-75">SSI</p></div>
+                    <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.linkedinGlobalScore}</p><p class="opacity-75">LinkedIn</p></div>
+                    <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.globalScore}</p><p class="opacity-75">ADN</p></div>
+                    <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.deptScore}</p><p class="opacity-75">Métier</p></div>
+                </div>
+                <p class="text-sm opacity-75 mt-4">📝 ${emp.wordCount} mots analysés • Dernière analyse : ${new Date(emp.analyzedAt).toLocaleDateString('fr-FR')}</p>
             </div></div>`;
             
             return html;
