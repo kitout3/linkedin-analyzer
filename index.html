@@ -252,6 +252,228 @@
             return { linkedinGlobalScore, completudeScore: Math.round(completudeScore), coherenceScore: Math.round(coherenceScore), visibilityScore: Math.round(visibilityScore), engagementScore: Math.round(engagementScore), foundSEOKeywords };
         }
 
+        // ===== SCORE ATS (Applicant Tracking System) =====
+        function calculateATSScore(profileText, employee, deptName) {
+            const text = profileText.toLowerCase();
+            const normalizedText = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            
+            // Dictionnaire de synonymes
+            const synonyms = {
+                'daf': ['cfo', 'directeur financier', 'directeur administratif financier'],
+                'drh': ['chro', 'directeur ressources humaines', 'chief people officer'],
+                'dg': ['ceo', 'directeur général', 'pdg', 'président'],
+                'dsi': ['cio', 'cto', 'directeur systèmes information'],
+                'kam': ['key account manager', 'grands comptes'],
+                'csm': ['customer success manager', 'customer success'],
+                'sdr': ['sales development representative', 'business development representative'],
+                'crm': ['salesforce', 'hubspot', 'dynamics', 'pipedrive'],
+                'erp': ['sap', 'oracle', 'sage', 'cegid'],
+                'bi': ['power bi', 'tableau', 'qlik', 'looker']
+            };
+            
+            // Fonction pour chercher avec synonymes
+            const findWithSynonyms = (searchText, keywords) => {
+                return keywords.filter(kw => {
+                    const kwLower = kw.toLowerCase();
+                    if (searchText.includes(kwLower)) return true;
+                    // Vérifier les synonymes
+                    for (const [key, syns] of Object.entries(synonyms)) {
+                        if (kwLower.includes(key) || syns.some(s => kwLower.includes(s))) {
+                            if (searchText.includes(key) || syns.some(s => searchText.includes(s))) return true;
+                        }
+                    }
+                    return false;
+                });
+            };
+            
+            // 1. TitleFit (0-20) - Correspondance des titres
+            const seniorTitles = ['directeur', 'director', 'head', 'lead', 'responsable', 'manager', 'chief', 'vp', 'vice-président', 'associé', 'partner', 'président', 'ceo', 'cfo', 'cto', 'coo'];
+            const hasSeniorTitle = seniorTitles.some(t => normalizedText.includes(t));
+            const titleMatch = employee.position ? 12 : 0;
+            const seniorBonus = hasSeniorTitle ? 8 : 0;
+            const titleFit = Math.min(20, titleMatch + seniorBonus);
+            
+            // 2. ToolsFit (0-15) - Outils et technologies
+            const toolsKeywords = [
+                // CRM & Sales
+                'salesforce', 'hubspot', 'pipedrive', 'dynamics', 'zoho',
+                // Finance & Compta
+                'sap', 'oracle', 'sage', 'cegid', 'quadra', 'excel', 'vba',
+                // BI & Data
+                'power bi', 'tableau', 'qlik', 'looker', 'sql', 'python',
+                // Marketing
+                'google analytics', 'semrush', 'mailchimp', 'marketo', 'pardot',
+                // IT & Support
+                'servicenow', 'jira', 'confluence', 'zendesk', 'freshdesk',
+                // RH
+                'workday', 'talentsoft', 'cornerstone', 'linkedin recruiter',
+                // Collaboration
+                'microsoft 365', 'google workspace', 'slack', 'teams', 'notion', 'trello', 'asana'
+            ];
+            const foundTools = toolsKeywords.filter(t => normalizedText.includes(t.toLowerCase()));
+            const toolsFit = Math.min(15, Math.round((foundTools.length / 5) * 15));
+            
+            // 3. SeniorityFit (0-15) - Ancienneté et progression
+            // Détecter les années d'expérience
+            const yearsPatterns = [
+                /(\d+)\s*(?:ans?|années?)\s*(?:d['']?expérience|d['']?exp)/gi,
+                /(?:depuis|from)\s*(\d{4})/gi,
+                /(\d+)\+?\s*(?:years?|ans?)/gi
+            ];
+            let totalYears = 0;
+            yearsPatterns.forEach(pattern => {
+                const matches = normalizedText.matchAll(pattern);
+                for (const match of matches) {
+                    const num = parseInt(match[1]);
+                    if (num > 1900 && num < 2030) {
+                        totalYears = Math.max(totalYears, 2025 - num);
+                    } else if (num < 50) {
+                        totalYears = Math.max(totalYears, num);
+                    }
+                }
+            });
+            
+            // Détecter progression de carrière
+            const progressionKeywords = ['évolution', 'promotion', 'promu', 'devenu', 'nommé', 'progression'];
+            const hasProgression = progressionKeywords.some(p => normalizedText.includes(p));
+            
+            const yearsScore = Math.min(10, totalYears >= 10 ? 10 : totalYears >= 5 ? 7 : totalYears >= 2 ? 4 : 2);
+            const progressionBonus = hasProgression ? 5 : (hasSeniorTitle ? 3 : 0);
+            const seniorityFit = Math.min(15, yearsScore + progressionBonus);
+            
+            // 4. ImpactKPI (0-25) - Résultats chiffrés et KPIs
+            const kpiPatterns = [
+                /[+\-]?\d+(?:[,\.]\d+)?\s*%/g,                    // Pourcentages
+                /\d+(?:[,\.]\d+)?\s*[kKmM]?€/g,                   // Montants euros
+                /€\s*\d+(?:[,\.]\d+)?\s*[kKmM]?/g,                // Euros avant
+                /\d+(?:[,\.]\d+)?\s*(?:millions?|mio|m€|k€)/gi,   // Millions/K
+                /(?:x|×)\s*\d+(?:[,\.]\d+)?/g,                    // Multiplicateurs
+                /\d+\s*(?:clients?|comptes?|dossiers?|projets?)/gi, // Volumes
+                /(?:arr|mrr|aum|nps|csat|ebitda|ca|chiffre d'affaires)[\s:]*\d+/gi, // KPIs nommés
+                /(?:top|n°)\s*\d+/gi,                              // Rankings
+                /\d+\s*(?:collaborateurs?|personnes?|équipe)/gi    // Taille équipe
+            ];
+            
+            let kpiCount = 0;
+            let kpiQuality = 0;
+            const kpiMatches = [];
+            
+            kpiPatterns.forEach(pattern => {
+                const matches = normalizedText.match(pattern) || [];
+                kpiCount += matches.length;
+                matches.forEach(m => kpiMatches.push(m));
+            });
+            
+            // Qualité des KPIs (avec contexte d'impact)
+            const impactWords = ['augment', 'croissance', 'hausse', 'progression', 'amélio', 'réduit', 'baisse', 'diminut', 'optimis', 'génér', 'atteint', 'dépass', 'réalis'];
+            const hasImpactContext = impactWords.some(w => normalizedText.includes(w));
+            kpiQuality = hasImpactContext ? 1 : (kpiCount > 0 ? 0.5 : 0);
+            
+            const impactKPI = Math.min(25, Math.round(5 * Math.log1p(kpiCount) + 15 * kpiQuality));
+            
+            // 5. Credibility (0-15) - Crédibilité
+            // Recommandations
+            const recoMatch = normalizedText.match(/(\d+)\s*recommandation/i);
+            const recoCount = recoMatch ? parseInt(recoMatch[1]) : 0;
+            const recoScore = Math.min(5, recoCount);
+            
+            // Certifications pertinentes
+            const certKeywords = ['certifi', 'diplôm', 'master', 'mba', 'cfa', 'amf', 'acpr', 'cgp', 'cif', 'iobsp', 'ias', 'aws', 'google', 'scrum', 'pmp', 'itil', 'prince2'];
+            const certCount = certKeywords.filter(c => normalizedText.includes(c)).length;
+            const certScore = Math.min(5, certCount * 1.5);
+            
+            // Stabilité (mentions de durée longue)
+            const stabilityPatterns = [/(\d+)\s*ans?\s*(?:chez|at|dans)/gi, /depuis\s*(\d{4})/gi];
+            let hasStability = false;
+            stabilityPatterns.forEach(pattern => {
+                const matches = normalizedText.matchAll(pattern);
+                for (const match of matches) {
+                    const num = parseInt(match[1]);
+                    if ((num >= 3 && num < 50) || (num > 1900 && 2025 - num >= 3)) {
+                        hasStability = true;
+                    }
+                }
+            });
+            const stabilityScore = hasStability ? 3 : 1;
+            
+            // Connexions LinkedIn
+            const connexionMatch = normalizedText.match(/(\d+)\s*(?:connexions?|relations?|contacts?)/i);
+            const connexionCount = connexionMatch ? parseInt(connexionMatch[1]) : 0;
+            const connexionScore = connexionCount >= 500 ? 2 : (connexionCount >= 200 ? 1 : 0);
+            
+            const credibility = Math.min(15, Math.round(recoScore + certScore + stabilityScore + connexionScore));
+            
+            // 6. ContextFit (0-10) - Contexte
+            const locationKeywords = ['paris', 'lyon', 'marseille', 'bordeaux', 'nantes', 'toulouse', 'lille', 'france', 'île-de-france', 'remote', 'télétravail', 'hybride'];
+            const hasLocation = locationKeywords.some(l => normalizedText.includes(l));
+            
+            const sectorKeywords = ['finance', 'banque', 'assurance', 'patrimoine', 'gestion', 'investissement', 'conseil', 'audit', 'immobilier'];
+            const hasSector = sectorKeywords.some(s => normalizedText.includes(s));
+            
+            const contextFit = (hasLocation ? 5 : 2) + (hasSector ? 5 : 2);
+            
+            // Score final ATS (pondéré selon la catégorie)
+            const weights = {
+                titleFit: 0.15,
+                toolsFit: 0.12,
+                seniorityFit: 0.13,
+                impactKPI: 0.25,
+                credibility: 0.15,
+                contextFit: 0.08,
+                keywordFit: 0.12  // Utilise le score métier existant
+            };
+            
+            // Récupérer le score métier comme keywordFit
+            const deptScore = employee.deptScore || 0;
+            const keywordFitNormalized = (deptScore / 100) * 20; // Normaliser sur 20
+            
+            const rawScore = 
+                (titleFit / 20) * 100 * weights.titleFit +
+                (toolsFit / 15) * 100 * weights.toolsFit +
+                (seniorityFit / 15) * 100 * weights.seniorityFit +
+                (impactKPI / 25) * 100 * weights.impactKPI +
+                (credibility / 15) * 100 * weights.credibility +
+                (contextFit / 10) * 100 * weights.contextFit +
+                (keywordFitNormalized / 20) * 100 * weights.keywordFit;
+            
+            const atsScore = Math.round(rawScore);
+            
+            // Décision ATS
+            let atsDecision, atsDecisionColor;
+            if (atsScore >= 80) {
+                atsDecision = "🟢 Shortlist";
+                atsDecisionColor = "green";
+            } else if (atsScore >= 65) {
+                atsDecision = "🟡 À examiner";
+                atsDecisionColor = "yellow";
+            } else if (atsScore >= 40) {
+                atsDecision = "🟠 En attente";
+                atsDecisionColor = "orange";
+            } else {
+                atsDecision = "🔴 Non retenu";
+                atsDecisionColor = "red";
+            }
+            
+            return {
+                atsScore,
+                atsDecision,
+                atsDecisionColor,
+                atsTitleFit: titleFit,
+                atsToolsFit: toolsFit,
+                atsSeniorityFit: seniorityFit,
+                atsImpactKPI: impactKPI,
+                atsCredibility: credibility,
+                atsContextFit: contextFit,
+                atsFoundTools: foundTools,
+                atsKPICount: kpiCount,
+                atsKPIMatches: kpiMatches.slice(0, 10),
+                atsTotalYears: totalYears,
+                atsHasProgression: hasProgression,
+                atsCertCount: certCount,
+                atsRecoCount: recoCount
+            };
+        }
+
         function calculateDeptScore(profileText, deptName) {
             const dept = state.departments.find(d => d.name === deptName);
             if (!dept) return { score: 0, foundKeywords: [], missingKeywords: [], totalKeywords: 0 };
@@ -304,10 +526,16 @@
                 deptMissingKeywords: deptAnalysis.missingKeywords, deptTotalKeywords: deptAnalysis.totalKeywords, createdAt: new Date().toISOString()
             };
             Object.assign(newEmployee, calculateLinkedInScore(text, newEmployee), calculateSSI(text, newEmployee));
+            Object.assign(newEmployee, calculateATSScore(text, newEmployee, autoDept));
             state.employees.push(newEmployee);
             saveState();
             render();
-            alert('✅ Profil ajouté : ' + newEmployee.firstName + ' ' + newEmployee.lastName + '\n\n📊 Score SSI : ' + newEmployee.ssiScore + '/100\n🔵 Score LinkedIn : ' + newEmployee.linkedinGlobalScore + '/100\n🧬 Score ADN : ' + newEmployee.globalScore + '/100\n💼 Score Métier : ' + newEmployee.deptScore + '/100');
+            alert('✅ Profil ajouté : ' + newEmployee.firstName + ' ' + newEmployee.lastName + 
+                '\n\n📊 Score SSI : ' + newEmployee.ssiScore + '/100' +
+                '\n🔵 Score LinkedIn : ' + newEmployee.linkedinGlobalScore + '/100' +
+                '\n🧬 Score ADN : ' + newEmployee.globalScore + '/100' +
+                '\n💼 Score Métier : ' + newEmployee.deptScore + '/100' +
+                '\n🎯 Score ATS : ' + newEmployee.atsScore + '/100 ' + newEmployee.atsDecision);
         }
 
         function deleteEmployee(id) {
@@ -638,6 +866,152 @@
             
             return recommendations;
         }
+        
+        // ===== SYNTHÈSE ET PRÉCONISATIONS ATS =====
+        function getATSSynthesis(emp) {
+            const score = emp.atsScore || 0;
+            
+            let level, description, verdict;
+            if (score >= 80) {
+                level = "🟢 Shortlist";
+                verdict = "Profil hautement qualifié";
+                description = `Le profil de ${emp.firstName} obtient un excellent score ATS de ${score}/100. Il répond aux critères clés d'un recruteur : expérience, compétences, résultats chiffrés. Ce candidat mérite d'être contacté en priorité.`;
+            } else if (score >= 65) {
+                level = "🟡 À examiner";
+                verdict = "Profil intéressant";
+                description = `Avec ${score}/100, le profil de ${emp.firstName} présente de bons atouts mais nécessite un examen approfondi. Quelques optimisations permettraient de passer en shortlist.`;
+            } else if (score >= 40) {
+                level = "🟠 En attente";
+                verdict = "Profil à développer";
+                description = `Le score ATS de ${score}/100 indique que le profil de ${emp.firstName} manque d'éléments clés pour convaincre un recruteur. Des améliorations significatives sont nécessaires.`;
+            } else {
+                level = "🔴 Non retenu";
+                verdict = "Profil insuffisant";
+                description = `Avec ${score}/100, le profil de ${emp.firstName} ne passerait pas les filtres ATS standard. Une refonte complète du profil est recommandée.`;
+            }
+            
+            // Points forts
+            const strengths = [];
+            if ((emp.atsTitleFit || 0) >= 15) strengths.push("Titre de poste pertinent");
+            if ((emp.atsImpactKPI || 0) >= 18) strengths.push("Résultats chiffrés présents");
+            if ((emp.atsToolsFit || 0) >= 10) strengths.push("Outils maîtrisés mentionnés");
+            if ((emp.atsSeniorityFit || 0) >= 12) strengths.push("Expérience solide");
+            if ((emp.atsCredibility || 0) >= 10) strengths.push("Crédibilité établie");
+            
+            // Points faibles
+            const weaknesses = [];
+            if ((emp.atsImpactKPI || 0) < 10) weaknesses.push("Manque de résultats chiffrés");
+            if ((emp.atsToolsFit || 0) < 5) weaknesses.push("Outils non mentionnés");
+            if ((emp.atsSeniorityFit || 0) < 8) weaknesses.push("Expérience peu visible");
+            if ((emp.atsCredibility || 0) < 8) weaknesses.push("Crédibilité à renforcer");
+            
+            return { level, verdict, description, strengths, weaknesses };
+        }
+        
+        function getATSRecommendations(emp) {
+            const recommendations = [];
+            
+            // ImpactKPI - Le plus important !
+            if ((emp.atsImpactKPI || 0) < 18) {
+                const priority = (emp.atsImpactKPI || 0) < 10 ? "haute" : "moyenne";
+                recommendations.push({
+                    priority,
+                    category: "📊 Ajouter des résultats chiffrés",
+                    pillar: "ImpactKPI",
+                    score: emp.atsImpactKPI || 0,
+                    maxScore: 25,
+                    actions: [
+                        "Quantifier vos réalisations avec des % (ex: '+25% de CA', '-15% de coûts')",
+                        "Mentionner les montants gérés (ex: 'Portefeuille de 50M€', 'Budget de 2M€')",
+                        "Indiquer les volumes traités (ex: '200 clients', '50 dossiers/mois')",
+                        "Ajouter des KPIs métier (NPS, CSAT, AUM, ARR, taux de conversion...)",
+                        "Préciser la taille des équipes managées"
+                    ],
+                    examples: [
+                        "❌ 'Responsable du développement commercial'",
+                        "✅ 'Développement du CA de +35% (2M€→2.7M€) sur 18 mois, portefeuille de 150 clients'"
+                    ]
+                });
+            }
+            
+            // ToolsFit
+            if ((emp.atsToolsFit || 0) < 10) {
+                recommendations.push({
+                    priority: "moyenne",
+                    category: "🛠️ Mentionner les outils maîtrisés",
+                    pillar: "ToolsFit",
+                    score: emp.atsToolsFit || 0,
+                    maxScore: 15,
+                    actions: [
+                        "Lister les logiciels métier dans la section Compétences",
+                        "Mentionner les outils dans les descriptions d'expériences",
+                        "Ajouter les certifications logicielles obtenues"
+                    ],
+                    suggestedTools: [
+                        "CRM : Salesforce, HubSpot, Dynamics, Pipedrive",
+                        "Finance : SAP, Oracle, Sage, Cegid, Excel avancé",
+                        "BI/Data : Power BI, Tableau, SQL, Python",
+                        "Marketing : Google Analytics, SEMrush, Mailchimp",
+                        "Collaboration : Microsoft 365, Slack, Notion, Jira"
+                    ]
+                });
+            }
+            
+            // SeniorityFit
+            if ((emp.atsSeniorityFit || 0) < 10) {
+                recommendations.push({
+                    priority: "moyenne",
+                    category: "📅 Valoriser l'expérience",
+                    pillar: "SeniorityFit",
+                    score: emp.atsSeniorityFit || 0,
+                    maxScore: 15,
+                    actions: [
+                        "Préciser le nombre d'années d'expérience dans le résumé",
+                        "Montrer la progression de carrière (promotions, évolutions)",
+                        "Dater clairement chaque expérience (mois/année)",
+                        "Mettre en avant les responsabilités croissantes"
+                    ]
+                });
+            }
+            
+            // TitleFit
+            if ((emp.atsTitleFit || 0) < 15) {
+                recommendations.push({
+                    priority: "moyenne",
+                    category: "🏷️ Optimiser le titre",
+                    pillar: "TitleFit",
+                    score: emp.atsTitleFit || 0,
+                    maxScore: 20,
+                    actions: [
+                        "Utiliser un titre de poste standard et recherché",
+                        "Ajouter des mots-clés métier au titre (ex: 'CGP | Gestion de Patrimoine | Transmission')",
+                        "Éviter les titres trop créatifs non reconnus par les ATS"
+                    ]
+                });
+            }
+            
+            // Credibility
+            if ((emp.atsCredibility || 0) < 10) {
+                recommendations.push({
+                    priority: "basse",
+                    category: "🏅 Renforcer la crédibilité",
+                    pillar: "Credibility",
+                    score: emp.atsCredibility || 0,
+                    maxScore: 15,
+                    actions: [
+                        "Demander des recommandations LinkedIn (objectif : 5+)",
+                        "Ajouter les certifications professionnelles (AMF, CIF, IOBSP...)",
+                        "Mentionner les formations diplômantes (Master, MBA, CFA...)",
+                        "Montrer une stabilité professionnelle (durées > 2 ans)"
+                    ]
+                });
+            }
+            
+            return recommendations.sort((a, b) => {
+                const priorityOrder = { haute: 0, moyenne: 1, basse: 2 };
+                return priorityOrder[a.priority] - priorityOrder[b.priority];
+            });
+        }
 
         function handleAddEmployee(event) {
             event.preventDefault();
@@ -658,6 +1032,7 @@
                 deptTotalKeywords: deptAnalysis.totalKeywords, createdAt: new Date().toISOString()
             };
             Object.assign(newEmployee, calculateLinkedInScore(profileText, newEmployee), calculateSSI(profileText, newEmployee));
+            Object.assign(newEmployee, calculateATSScore(profileText, newEmployee, department));
             state.employees.push(newEmployee);
             saveState();
             state.currentView = 'list';
@@ -686,6 +1061,7 @@
             const avgScore = state.employees.length > 0 ? Math.round(state.employees.reduce((sum, emp) => sum + emp.globalScore, 0) / state.employees.length) : 0;
             const avgLinkedInScore = state.employees.length > 0 ? Math.round(state.employees.reduce((sum, emp) => sum + (emp.linkedinGlobalScore || 0), 0) / state.employees.length) : 0;
             const avgSSIScore = state.employees.length > 0 ? Math.round(state.employees.reduce((sum, emp) => sum + (emp.ssiScore || 0), 0) / state.employees.length) : 0;
+            const avgATSScore = state.employees.length > 0 ? Math.round(state.employees.reduce((sum, emp) => sum + (emp.atsScore || 0), 0) / state.employees.length) : 0;
             
             let html = `<div class="space-y-4">
                 <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
@@ -694,12 +1070,13 @@
                 </div>`;
             
             if (state.employees.length > 0) {
-                html += `<div class="grid grid-cols-5 gap-4">
-                    <div class="bg-white p-4 rounded-lg shadow-sm text-center"><p class="text-3xl font-bold text-blue-600">${state.employees.length}</p><p class="text-sm text-gray-600">Profils</p></div>
-                    <div class="bg-white p-4 rounded-lg shadow-sm text-center"><p class="text-3xl font-bold text-purple-600">${avgSSIScore}</p><p class="text-sm text-gray-600">SSI moyen</p></div>
-                    <div class="bg-white p-4 rounded-lg shadow-sm text-center"><p class="text-3xl font-bold text-indigo-600">${avgLinkedInScore}</p><p class="text-sm text-gray-600">LinkedIn moyen</p></div>
-                    <div class="bg-white p-4 rounded-lg shadow-sm text-center"><p class="text-3xl font-bold text-green-600">${avgScore}</p><p class="text-sm text-gray-600">ADN moyen</p></div>
-                    <div class="bg-white p-4 rounded-lg shadow-sm text-center"><p class="text-3xl font-bold text-orange-600">${state.employees.filter(e => e.ssiScore >= 75).length}</p><p class="text-sm text-gray-600">SSI excellents</p></div>
+                html += `<div class="grid grid-cols-6 gap-3">
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-blue-600">${state.employees.length}</p><p class="text-xs text-gray-600">Profils</p></div>
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-purple-600">${avgSSIScore}</p><p class="text-xs text-gray-600">SSI moy.</p></div>
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-indigo-600">${avgLinkedInScore}</p><p class="text-xs text-gray-600">LinkedIn</p></div>
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-green-600">${avgScore}</p><p class="text-xs text-gray-600">ADN moy.</p></div>
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-amber-600">${avgATSScore}</p><p class="text-xs text-gray-600">ATS moy.</p></div>
+                    <div class="bg-white p-3 rounded-lg shadow-sm text-center"><p class="text-2xl font-bold text-emerald-600">${state.employees.filter(e => (e.atsScore || 0) >= 65).length}</p><p class="text-xs text-gray-600">Shortlist</p></div>
                 </div>`;
             }
             
@@ -716,11 +1093,15 @@
             
             html += '<div class="grid gap-4">';
             state.employees.forEach(emp => {
+                const atsDecisionBadge = (emp.atsScore || 0) >= 80 ? 'bg-green-100 text-green-700' : 
+                    (emp.atsScore || 0) >= 65 ? 'bg-yellow-100 text-yellow-700' : 
+                    (emp.atsScore || 0) >= 40 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700';
                 html += `<div class="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
                             <div class="flex items-center gap-2">
                                 <h3 class="text-lg font-semibold text-gray-900">${emp.firstName} ${emp.lastName}</h3>
+                                ${emp.atsDecision ? '<span class="text-xs px-2 py-0.5 rounded ' + atsDecisionBadge + '">' + emp.atsDecision + '</span>' : ''}
                                 ${emp.email ? '<span class="text-sm">📧</span>' : ''}
                                 ${emp.linkedinUrl && isValidLinkedInURL(emp.linkedinUrl) ? '<span class="text-sm">🔗</span>' : ''}
                             </div>
@@ -730,11 +1111,12 @@
                                 ${emp.company ? '<span class="text-gray-400">•</span><span class="text-gray-500">' + emp.company + '</span>' : ''}
                             </div>
                         </div>
-                        <div class="flex gap-2">
-                            <div class="text-center"><div class="px-3 py-1 rounded-full text-sm font-semibold ${getScoreBadge(emp.ssiScore || 0)}">${emp.ssiScore || 0}</div><p class="text-xs text-gray-500 mt-1">SSI</p></div>
-                            <div class="text-center"><div class="px-3 py-1 rounded-full text-sm font-semibold ${getScoreBadge(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}</div><p class="text-xs text-gray-500 mt-1">LinkedIn</p></div>
-                            <div class="text-center"><div class="px-3 py-1 rounded-full text-sm font-semibold ${getScoreBadge(emp.globalScore)}">${emp.globalScore}</div><p class="text-xs text-gray-500 mt-1">ADN</p></div>
-                            <div class="text-center"><div class="px-3 py-1 rounded-full text-sm font-semibold ${getScoreBadge(emp.deptScore)}">${emp.deptScore}</div><p class="text-xs text-gray-500 mt-1">Métier</p></div>
+                        <div class="flex gap-1">
+                            <div class="text-center px-2"><div class="px-2 py-1 rounded-full text-xs font-semibold ${getScoreBadge(emp.ssiScore || 0)}">${emp.ssiScore || 0}</div><p class="text-xs text-gray-500 mt-1">SSI</p></div>
+                            <div class="text-center px-2"><div class="px-2 py-1 rounded-full text-xs font-semibold ${getScoreBadge(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}</div><p class="text-xs text-gray-500 mt-1">LinkedIn</p></div>
+                            <div class="text-center px-2"><div class="px-2 py-1 rounded-full text-xs font-semibold ${getScoreBadge(emp.globalScore)}">${emp.globalScore}</div><p class="text-xs text-gray-500 mt-1">ADN</p></div>
+                            <div class="text-center px-2"><div class="px-2 py-1 rounded-full text-xs font-semibold ${getScoreBadge(emp.deptScore)}">${emp.deptScore}</div><p class="text-xs text-gray-500 mt-1">Métier</p></div>
+                            <div class="text-center px-2"><div class="px-2 py-1 rounded-full text-xs font-semibold ${getScoreBadge(emp.atsScore || 0)}">${emp.atsScore || 0}</div><p class="text-xs text-gray-500 mt-1">ATS</p></div>
                         </div>
                     </div>
                     <div class="flex gap-2 mt-4">
@@ -788,11 +1170,12 @@
                 
                 <div class="bg-white p-6 rounded-lg shadow-sm">
                     <h3 class="text-lg font-semibold mb-4">🏆 Scores globaux</h3>
-                    <div class="grid grid-cols-4 gap-4">
-                        <div><p class="text-sm text-gray-600 mb-2">📊 SSI</p><span class="text-4xl font-bold ${getScoreColor(emp.ssiScore || 0)}">${emp.ssiScore || 0}</span><span class="text-gray-500">/100</span></div>
-                        <div><p class="text-sm text-gray-600 mb-2">🔵 LinkedIn</p><span class="text-4xl font-bold ${getScoreColor(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}</span><span class="text-gray-500">/100</span></div>
-                        <div><p class="text-sm text-gray-600 mb-2">🧬 ADN</p><span class="text-4xl font-bold ${getScoreColor(emp.globalScore)}">${emp.globalScore}</span><span class="text-gray-500">/100</span></div>
-                        <div><p class="text-sm text-gray-600 mb-2">💼 Métier</p><span class="text-4xl font-bold ${getScoreColor(emp.deptScore)}">${emp.deptScore}</span><span class="text-gray-500">/100</span></div>
+                    <div class="grid grid-cols-5 gap-4">
+                        <div><p class="text-sm text-gray-600 mb-2">📊 SSI</p><span class="text-3xl font-bold ${getScoreColor(emp.ssiScore || 0)}">${emp.ssiScore || 0}</span><span class="text-gray-500">/100</span></div>
+                        <div><p class="text-sm text-gray-600 mb-2">🔵 LinkedIn</p><span class="text-3xl font-bold ${getScoreColor(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}</span><span class="text-gray-500">/100</span></div>
+                        <div><p class="text-sm text-gray-600 mb-2">🧬 ADN</p><span class="text-3xl font-bold ${getScoreColor(emp.globalScore)}">${emp.globalScore}</span><span class="text-gray-500">/100</span></div>
+                        <div><p class="text-sm text-gray-600 mb-2">💼 Métier</p><span class="text-3xl font-bold ${getScoreColor(emp.deptScore)}">${emp.deptScore}</span><span class="text-gray-500">/100</span></div>
+                        <div><p class="text-sm text-gray-600 mb-2">🎯 ATS</p><span class="text-3xl font-bold ${getScoreColor(emp.atsScore || 0)}">${emp.atsScore || 0}</span><span class="text-gray-500">/100</span><p class="text-xs mt-1 ${(emp.atsScore || 0) >= 65 ? 'text-green-600' : 'text-orange-600'}">${emp.atsDecision || ''}</p></div>
                     </div>
                 </div>`;
             
@@ -969,8 +1352,92 @@
                 </div>`;
             }
             
+            // Section ATS détaillée
+            if (emp.atsScore !== undefined) {
+                const atsSynthesis = getATSSynthesis(emp);
+                const atsRecos = getATSRecommendations(emp);
+                
+                html += `<div class="bg-gradient-to-r from-emerald-50 to-teal-50 p-6 rounded-lg border border-emerald-200">
+                    <h3 class="text-lg font-semibold mb-4 text-emerald-900">🎯 Score ATS (Applicant Tracking System)</h3>
+                    
+                    <!-- Synthèse ATS -->
+                    <div class="bg-white p-4 rounded-lg mb-4 border-l-4 ${(emp.atsScore || 0) >= 65 ? 'border-green-500' : (emp.atsScore || 0) >= 40 ? 'border-yellow-500' : 'border-red-500'}">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="text-2xl font-bold ${getScoreColor(emp.atsScore || 0)}">${emp.atsScore || 0}/100</span>
+                            <span class="px-3 py-1 rounded-full text-sm font-semibold ${(emp.atsScore || 0) >= 80 ? 'bg-green-100 text-green-700' : (emp.atsScore || 0) >= 65 ? 'bg-yellow-100 text-yellow-700' : (emp.atsScore || 0) >= 40 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}">${emp.atsDecision || ''}</span>
+                            <span class="text-gray-600 font-medium">${atsSynthesis.verdict}</span>
+                        </div>
+                        <p class="text-gray-700">${atsSynthesis.description}</p>
+                        ${atsSynthesis.strengths.length > 0 ? '<p class="text-green-700 mt-2"><strong>✅ Points forts :</strong> ' + atsSynthesis.strengths.join(' • ') + '</p>' : ''}
+                        ${atsSynthesis.weaknesses.length > 0 ? '<p class="text-orange-700 mt-1"><strong>⚠️ À améliorer :</strong> ' + atsSynthesis.weaknesses.join(' • ') + '</p>' : ''}
+                    </div>
+                    
+                    <!-- Piliers ATS -->
+                    <div class="bg-white p-4 rounded-lg mb-4">
+                        <p class="font-semibold mb-3">Analyse des 6 piliers ATS</p>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between mb-1"><span class="text-sm">🏷️ TitleFit (Titre de poste)</span><span class="font-bold ${(emp.atsTitleFit || 0) >= 15 ? 'text-green-600' : (emp.atsTitleFit || 0) >= 10 ? 'text-yellow-600' : 'text-red-600'}">${emp.atsTitleFit || 0}/20</span></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-blue-500" style="width: ${((emp.atsTitleFit || 0) / 20) * 100}%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-1"><span class="text-sm">📊 ImpactKPI (Résultats chiffrés)</span><span class="font-bold ${(emp.atsImpactKPI || 0) >= 18 ? 'text-green-600' : (emp.atsImpactKPI || 0) >= 10 ? 'text-yellow-600' : 'text-red-600'}">${emp.atsImpactKPI || 0}/25</span></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-purple-500" style="width: ${((emp.atsImpactKPI || 0) / 25) * 100}%"></div></div>
+                                ${(emp.atsKPICount || 0) > 0 ? '<p class="text-xs text-gray-500 mt-1">' + (emp.atsKPICount || 0) + ' KPIs détectés' + ((emp.atsKPIMatches || []).length > 0 ? ' : ' + (emp.atsKPIMatches || []).slice(0, 5).join(', ') : '') + '</p>' : '<p class="text-xs text-red-500 mt-1">Aucun KPI détecté - ajoutez des chiffres !</p>'}
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-1"><span class="text-sm">🛠️ ToolsFit (Outils maîtrisés)</span><span class="font-bold ${(emp.atsToolsFit || 0) >= 10 ? 'text-green-600' : (emp.atsToolsFit || 0) >= 5 ? 'text-yellow-600' : 'text-red-600'}">${emp.atsToolsFit || 0}/15</span></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-teal-500" style="width: ${((emp.atsToolsFit || 0) / 15) * 100}%"></div></div>
+                                ${(emp.atsFoundTools || []).length > 0 ? '<p class="text-xs text-green-600 mt-1">✓ ' + (emp.atsFoundTools || []).join(', ') + '</p>' : ''}
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-1"><span class="text-sm">📅 SeniorityFit (Expérience)</span><span class="font-bold ${(emp.atsSeniorityFit || 0) >= 12 ? 'text-green-600' : (emp.atsSeniorityFit || 0) >= 8 ? 'text-yellow-600' : 'text-red-600'}">${emp.atsSeniorityFit || 0}/15</span></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-amber-500" style="width: ${((emp.atsSeniorityFit || 0) / 15) * 100}%"></div></div>
+                                <p class="text-xs text-gray-500 mt-1">${(emp.atsTotalYears || 0) > 0 ? '~' + (emp.atsTotalYears || 0) + ' ans détectés' : 'Années non détectées'}${emp.atsHasProgression ? ' • Progression de carrière visible' : ''}</p>
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-1"><span class="text-sm">🏅 Credibility (Crédibilité)</span><span class="font-bold ${(emp.atsCredibility || 0) >= 10 ? 'text-green-600' : (emp.atsCredibility || 0) >= 6 ? 'text-yellow-600' : 'text-red-600'}">${emp.atsCredibility || 0}/15</span></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-indigo-500" style="width: ${((emp.atsCredibility || 0) / 15) * 100}%"></div></div>
+                                <p class="text-xs text-gray-500 mt-1">${(emp.atsRecoCount || 0)} recommandations • ${(emp.atsCertCount || 0)} certifications détectées</p>
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-1"><span class="text-sm">📍 ContextFit (Contexte)</span><span class="font-bold ${(emp.atsContextFit || 0) >= 8 ? 'text-green-600' : (emp.atsContextFit || 0) >= 5 ? 'text-yellow-600' : 'text-red-600'}">${emp.atsContextFit || 0}/10</span></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full bg-gray-500" style="width: ${((emp.atsContextFit || 0) / 10) * 100}%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Préconisations ATS -->
+                    ${atsRecos.length > 0 ? `
+                    <div class="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-lg border border-amber-200">
+                        <p class="font-semibold text-amber-900 mb-3">🎯 Plan d'action pour améliorer le score ATS</p>
+                        <div class="space-y-4">
+                            ${atsRecos.map(reco => `
+                                <div class="bg-white p-4 rounded-lg">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="px-2 py-0.5 rounded text-xs font-medium ${reco.priority === 'haute' ? 'bg-red-100 text-red-700' : reco.priority === 'moyenne' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}">${reco.priority === 'haute' ? '🔴 Priorité haute' : reco.priority === 'moyenne' ? '🟡 Priorité moyenne' : '⚪ Optionnel'}</span>
+                                            <span class="font-semibold text-gray-800">${reco.category}</span>
+                                        </div>
+                                        <span class="text-sm ${getScoreColor(Math.round((reco.score / reco.maxScore) * 100))}">${reco.score}/${reco.maxScore}</span>
+                                    </div>
+                                    <ul class="text-sm text-gray-700 space-y-1 ml-4 mb-2">
+                                        ${reco.actions.map(a => '<li class="list-disc">' + a + '</li>').join('')}
+                                    </ul>
+                                    ${reco.examples ? '<div class="bg-gray-50 p-2 rounded text-xs"><p class="text-gray-600 mb-1">Exemple :</p>' + reco.examples.map(e => '<p class="' + (e.startsWith('❌') ? 'text-red-600' : 'text-green-600') + '">' + e + '</p>').join('') + '</div>' : ''}
+                                    ${reco.suggestedTools ? '<div class="mt-2"><p class="text-xs text-gray-600 mb-1">Outils à mentionner :</p><p class="text-xs text-teal-700">' + reco.suggestedTools.join(' | ') + '</p></div>' : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>` : `
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <p class="text-green-800">✅ Excellent score ATS ! Le profil est optimisé pour passer les filtres des systèmes de recrutement.</p>
+                    </div>`}
+                </div>`;
+            }
+            
             // Synthèse globale
-            const avgScore = Math.round((emp.ssiScore + emp.linkedinGlobalScore + emp.globalScore + emp.deptScore) / 4);
+            const avgScore = Math.round(((emp.ssiScore || 0) + (emp.linkedinGlobalScore || 0) + emp.globalScore + emp.deptScore + (emp.atsScore || 0)) / 5);
             let globalLevel, globalAdvice;
             if (avgScore >= 65) {
                 globalLevel = "🏆 Profil exemplaire";
@@ -998,11 +1465,12 @@
                         <p class="opacity-90">${globalAdvice}</p>
                     </div>
                 </div>
-                <div class="grid grid-cols-4 gap-2 text-center text-sm">
-                    <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.ssiScore}</p><p class="opacity-75">SSI</p></div>
-                    <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.linkedinGlobalScore}</p><p class="opacity-75">LinkedIn</p></div>
+                <div class="grid grid-cols-5 gap-2 text-center text-sm">
+                    <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.ssiScore || 0}</p><p class="opacity-75">SSI</p></div>
+                    <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.linkedinGlobalScore || 0}</p><p class="opacity-75">LinkedIn</p></div>
                     <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.globalScore}</p><p class="opacity-75">ADN</p></div>
                     <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.deptScore}</p><p class="opacity-75">Métier</p></div>
+                    <div class="bg-white/10 rounded p-2"><p class="font-bold">${emp.atsScore || 0}</p><p class="opacity-75">ATS</p></div>
                 </div>
                 <p class="text-sm opacity-75 mt-4">📝 ${emp.wordCount} mots analysés • Dernière analyse : ${new Date(emp.analyzedAt).toLocaleDateString('fr-FR')}</p>
             </div></div>`;
