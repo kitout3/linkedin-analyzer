@@ -169,18 +169,16 @@
         function analyzeProfile(profileText) {
             const wordCount = processText(profileText).length;
             
-            // Normaliser le texte du profil pour la recherche
+            // Normaliser le texte du profil
             const normalizedText = profileText.toLowerCase()
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                .replace(/[^\w\sàâäéèêëïîôùûüÿæœç-]/gi, ' ');
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             
             const axisScores = state.brandDNA.map(axis => {
+                // Un keyword est trouvé s'il apparaît dans le texte (en tant que substring)
                 const foundKeywords = axis.keywords.filter(keyword => {
                     const normalizedKeyword = keyword.toLowerCase()
                         .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                    const escapedKeyword = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const regex = new RegExp('(^|\\s|-)' + escapedKeyword + '($|\\s|-)', 'i');
-                    return regex.test(normalizedText);
+                    return normalizedText.includes(normalizedKeyword);
                 });
                 const rawScore = (foundKeywords.length / axis.keywords.length) * 100;
                 return {
@@ -258,21 +256,15 @@
             const dept = state.departments.find(d => d.name === deptName);
             if (!dept) return { score: 0, foundKeywords: [], missingKeywords: [], totalKeywords: 0 };
             
-            // Normaliser le texte du profil pour la recherche
+            // Normaliser le texte du profil
             const normalizedText = profileText.toLowerCase()
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Enlever accents pour comparaison
-                .replace(/[^\w\sàâäéèêëïîôùûüÿæœç-]/gi, ' '); // Garder lettres, chiffres, espaces, tirets
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             
+            // Un keyword est trouvé s'il apparaît dans le texte (en tant que substring)
             const foundKeywords = dept.keywords.filter(keyword => {
                 const normalizedKeyword = keyword.toLowerCase()
                     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                
-                // Créer une regex pour chercher le mot-clé complet (avec limites de mots)
-                // Échapper les caractères spéciaux de regex
-                const escapedKeyword = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const regex = new RegExp('(^|\\s|-)' + escapedKeyword + '($|\\s|-)', 'i');
-                
-                return regex.test(normalizedText);
+                return normalizedText.includes(normalizedKeyword);
             });
             
             return { 
