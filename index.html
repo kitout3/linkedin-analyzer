@@ -9,68 +9,7 @@
 <body class="bg-gray-50">
     <div id="app"></div>
 
-    <!-- Modal pour l'import de fichier -->
-    <div id="fileModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
-            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
-                <h3 class="text-xl font-bold text-white">📄 Importer un fichier</h3>
-                <p class="text-indigo-100 text-sm">PDF, PNG, JPG ou capture d'écran LinkedIn</p>
-            </div>
-            <div class="p-6">
-                <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-500 hover:bg-indigo-50 transition-all cursor-pointer">
-                    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp" class="hidden" />
-                    <div class="text-5xl mb-4">📁</div>
-                    <p class="text-gray-700 font-medium mb-2">Glissez un fichier ici</p>
-                    <p class="text-gray-500 text-sm mb-4">ou cliquez pour sélectionner</p>
-                    <p class="text-xs text-gray-400">PDF, PNG, JPG, WEBP • Max 10 MB</p>
-                </div>
-                <div id="filePreview" class="hidden mt-4 p-4 bg-gray-50 rounded-lg">
-                    <div class="flex items-center gap-3">
-                        <div id="previewIcon" class="text-3xl">📄</div>
-                        <div class="flex-1 min-w-0">
-                            <p id="fileName" class="font-medium text-gray-900 truncate"></p>
-                            <p id="fileSize" class="text-sm text-gray-500"></p>
-                        </div>
-                        <button onclick="clearFileSelection()" class="text-red-500 hover:bg-red-50 p-2 rounded">✕</button>
-                    </div>
-                </div>
-                <div id="processingStatus" class="hidden mt-4">
-                    <div class="flex items-center gap-3 p-4 bg-indigo-50 rounded-lg">
-                        <div class="animate-spin text-2xl">⏳</div>
-                        <div>
-                            <p class="font-medium text-indigo-900">Analyse en cours...</p>
-                            <p id="statusText" class="text-sm text-indigo-700">Extraction du texte avec Claude AI</p>
-                        </div>
-                    </div>
-                </div>
-                <div id="errorStatus" class="hidden mt-4">
-                    <div class="p-4 bg-red-50 rounded-lg border border-red-200">
-                        <p class="font-medium text-red-900">❌ Erreur</p>
-                        <p id="errorText" class="text-sm text-red-700 mt-1"></p>
-                    </div>
-                </div>
-                <div class="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <p class="text-sm text-amber-800">
-                        <strong>💡 Conseil :</strong> Pour de meilleurs résultats, faites une capture d'écran complète du profil LinkedIn ou exportez-le en PDF.
-                    </p>
-                </div>
-            </div>
-            <div class="px-6 py-4 bg-gray-50 flex gap-3">
-                <button id="analyzeFileBtn" onclick="analyzeFile()" disabled class="flex-1 bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                    🔍 Analyser le fichier
-                </button>
-                <button onclick="closeFileModal()" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">
-                    Annuler
-                </button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // Variables globales pour le fichier
-        let selectedFile = null;
-        let selectedFileBase64 = null;
-
         // State management
         let state = {
             employees: [],
@@ -142,261 +81,6 @@
             selectedEmployee: null,
             companyMission: "Cyrus Herez accompagne les dirigeants, entrepreneurs et familles dans la construction, la sécurisation et la transmission de leur patrimoine grâce à une approche globale intégrant conseil stratégique, ingénierie patrimoniale, allocation financière, immobilier et investissements alternatifs."
         };
-
-        // ===== FONCTIONS POUR LE MODAL DE FICHIER =====
-        
-        function openFileModal() {
-            document.getElementById('fileModal').classList.remove('hidden');
-            clearFileSelection();
-        }
-
-        function closeFileModal() {
-            document.getElementById('fileModal').classList.add('hidden');
-            clearFileSelection();
-        }
-
-        function clearFileSelection() {
-            selectedFile = null;
-            selectedFileBase64 = null;
-            document.getElementById('fileInput').value = '';
-            document.getElementById('filePreview').classList.add('hidden');
-            document.getElementById('dropZone').classList.remove('hidden');
-            document.getElementById('processingStatus').classList.add('hidden');
-            document.getElementById('errorStatus').classList.add('hidden');
-            document.getElementById('analyzeFileBtn').disabled = true;
-        }
-
-        function formatFileSize(bytes) {
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        }
-
-        function handleFileSelect(file) {
-            if (!file) return;
-            
-            const maxSize = 10 * 1024 * 1024;
-            if (file.size > maxSize) {
-                showError('Le fichier est trop volumineux (max 10 MB)');
-                return;
-            }
-
-            const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-            if (!validTypes.includes(file.type)) {
-                showError('Format non supporté. Utilisez PDF, PNG, JPG ou WEBP');
-                return;
-            }
-
-            selectedFile = file;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                selectedFileBase64 = e.target.result.split(',')[1];
-                
-                document.getElementById('dropZone').classList.add('hidden');
-                document.getElementById('filePreview').classList.remove('hidden');
-                document.getElementById('fileName').textContent = file.name;
-                document.getElementById('fileSize').textContent = formatFileSize(file.size);
-                
-                const icon = file.type === 'application/pdf' ? '📄' : '🖼️';
-                document.getElementById('previewIcon').textContent = icon;
-                
-                document.getElementById('analyzeFileBtn').disabled = false;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function showError(message) {
-            document.getElementById('errorStatus').classList.remove('hidden');
-            document.getElementById('errorText').textContent = message;
-            document.getElementById('processingStatus').classList.add('hidden');
-        }
-
-        function showProcessing(message) {
-            document.getElementById('processingStatus').classList.remove('hidden');
-            document.getElementById('statusText').textContent = message;
-            document.getElementById('errorStatus').classList.add('hidden');
-        }
-
-        async function analyzeFile() {
-            if (!selectedFile || !selectedFileBase64) {
-                showError('Aucun fichier sélectionné');
-                return;
-            }
-
-            document.getElementById('analyzeFileBtn').disabled = true;
-            showProcessing('Envoi du fichier à Claude AI...');
-
-            try {
-                let mediaType = selectedFile.type;
-                if (mediaType === 'image/jpg') mediaType = 'image/jpeg';
-
-                let content = [];
-                
-                if (selectedFile.type === 'application/pdf') {
-                    content = [
-                        { type: "document", source: { type: "base64", media_type: "application/pdf", data: selectedFileBase64 } },
-                        { type: "text", text: `Analyse ce profil LinkedIn (PDF). Extrais TOUT le texte visible du profil, incluant: nom complet, poste actuel, entreprise, résumé/à propos, expériences professionnelles, compétences, formation. Réponds UNIQUEMENT avec le texte extrait, sans commentaire ni mise en forme.` }
-                    ];
-                } else {
-                    content = [
-                        { type: "image", source: { type: "base64", media_type: mediaType, data: selectedFileBase64 } },
-                        { type: "text", text: `Analyse cette capture d'écran de profil LinkedIn. Extrais TOUT le texte visible du profil, incluant: nom complet, poste actuel, entreprise, résumé/à propos, expériences professionnelles, compétences, formation. Réponds UNIQUEMENT avec le texte extrait, sans commentaire ni mise en forme.` }
-                    ];
-                }
-
-                showProcessing('Extraction du texte en cours...');
-
-                const response = await fetch("https://api.anthropic.com/v1/messages", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        model: "claude-sonnet-4-20250514",
-                        max_tokens: 4000,
-                        messages: [{ role: "user", content: content }]
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error?.message || `Erreur API: ${response.status}`);
-                }
-
-                const data = await response.json();
-                
-                const extractedText = data.content
-                    .filter(item => item.type === "text")
-                    .map(item => item.text)
-                    .join("\n");
-
-                if (!extractedText || extractedText.length < 50) {
-                    throw new Error('Le texte extrait est trop court. Assurez-vous que l\'image/PDF contient un profil LinkedIn lisible.');
-                }
-
-                showProcessing('Analyse du profil...');
-                closeFileModal();
-                processExtractedText(extractedText);
-
-            } catch (error) {
-                console.error('Erreur:', error);
-                showError(error.message || 'Erreur lors de l\'analyse du fichier');
-                document.getElementById('analyzeFileBtn').disabled = false;
-            }
-        }
-
-        function processExtractedText(text) {
-            const rawLinkedinUrl = prompt('🔗 Collez l\'URL du profil LinkedIn (optionnel) :') || '';
-            let linkedinUrl = '';
-            if (rawLinkedinUrl.trim() !== '') {
-                if (!isValidLinkedInURL(rawLinkedinUrl.trim())) {
-                    alert('⚠️ L\'URL LinkedIn n\'est pas au bon format.\nFormat attendu : https://www.linkedin.com/in/username/');
-                    return;
-                }
-                linkedinUrl = rawLinkedinUrl.trim();
-            }
-
-            const extracted = extractProfileInfo(text);
-            const analysis = analyzeProfile(text);
-            
-            let firstName = extracted.firstName;
-            let lastName = extracted.lastName;
-            
-            if ((!firstName || !lastName) && linkedinUrl) {
-                const nameFromUrl = extractNameFromLinkedInUrl(linkedinUrl);
-                if (!firstName) firstName = nameFromUrl.firstName || 'Prénom';
-                if (!lastName)  lastName  = nameFromUrl.lastName  || 'Nom';
-            }
-            if (!firstName) firstName = 'Prénom';
-            if (!lastName)  lastName  = 'Nom';
-            
-            let autoDept = '';
-            let maxScore = 0;
-            state.departments.forEach(dept => {
-                const deptAnalysis = calculateDeptScore(text, dept.name);
-                if (deptAnalysis.score > maxScore) {
-                    maxScore = deptAnalysis.score;
-                    autoDept = dept.name;
-                }
-            });
-            
-            const deptAnalysis = calculateDeptScore(text, autoDept);
-            
-            const newEmployee = {
-                id: Date.now(),
-                firstName: firstName,
-                lastName: lastName,
-                position: extracted.position || 'Poste',
-                department: autoDept,
-                company: extracted.company || state.targetCompany,
-                linkedinUrl: linkedinUrl,
-                email: '',
-                profileText: text,
-                globalScore: analysis.globalScore,
-                axisScores: analysis.axisScores,
-                wordCount: analysis.wordCount,
-                analyzedAt: analysis.analyzedAt,
-                deptScore: deptAnalysis.score,
-                deptFoundKeywords: deptAnalysis.foundKeywords,
-                deptMissingKeywords: deptAnalysis.missingKeywords,
-                deptTotalKeywords: deptAnalysis.totalKeywords,
-                createdAt: new Date().toISOString(),
-                importedFrom: 'file'
-            };
-            
-            const linkedinScores = calculateLinkedInScore(text, newEmployee);
-            Object.assign(newEmployee, linkedinScores);
-            
-            const ssiScores = calculateSSI(text, newEmployee);
-            Object.assign(newEmployee, ssiScores);
-            
-            state.employees.push(newEmployee);
-            saveState();
-            render();
-            
-            alert(
-                '✅ Profil importé : ' + newEmployee.firstName + ' ' + newEmployee.lastName +
-                '\n\n📊 Score SSI : ' + newEmployee.ssiScore + '/100' +
-                '\n🔵 Score LinkedIn : ' + newEmployee.linkedinGlobalScore + '/100' +
-                '\n🧬 Score ADN : ' + newEmployee.globalScore + '/100' +
-                '\n💼 Score Métier : ' + newEmployee.deptScore + '/100'
-            );
-        }
-
-        // Event listeners pour le drag & drop
-        document.addEventListener('DOMContentLoaded', function() {
-            const dropZone = document.getElementById('dropZone');
-            const fileInput = document.getElementById('fileInput');
-
-            dropZone.addEventListener('click', () => fileInput.click());
-            
-            fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleFileSelect(e.target.files[0]);
-                }
-            });
-
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('border-indigo-500', 'bg-indigo-50');
-            });
-
-            dropZone.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
-                if (e.dataTransfer.files.length > 0) {
-                    handleFileSelect(e.dataTransfer.files[0]);
-                }
-            });
-
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') closeFileModal();
-            });
-        });
 
         // ===== FONCTIONS EXISTANTES =====
 
@@ -483,12 +167,21 @@
         }
 
         function analyzeProfile(profileText) {
-            const words = processText(profileText);
-            const wordCount = words.length;
+            const wordCount = processText(profileText).length;
+            
+            // Normaliser le texte du profil pour la recherche
+            const normalizedText = profileText.toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^\w\sàâäéèêëïîôùûüÿæœç-]/gi, ' ');
+            
             const axisScores = state.brandDNA.map(axis => {
-                const foundKeywords = axis.keywords.filter(keyword => 
-                    words.some(word => word.includes(keyword.toLowerCase()) || keyword.toLowerCase().includes(word))
-                );
+                const foundKeywords = axis.keywords.filter(keyword => {
+                    const normalizedKeyword = keyword.toLowerCase()
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    const escapedKeyword = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp('(^|\\s|-)' + escapedKeyword + '($|\\s|-)', 'i');
+                    return regex.test(normalizedText);
+                });
                 const rawScore = (foundKeywords.length / axis.keywords.length) * 100;
                 return {
                     axisId: axis.id,
@@ -564,11 +257,30 @@
         function calculateDeptScore(profileText, deptName) {
             const dept = state.departments.find(d => d.name === deptName);
             if (!dept) return { score: 0, foundKeywords: [], missingKeywords: [], totalKeywords: 0 };
-            const words = processText(profileText);
-            const foundKeywords = dept.keywords.filter(keyword => 
-                words.some(word => word.includes(keyword.toLowerCase()) || keyword.toLowerCase().includes(word))
-            );
-            return { score: Math.round((foundKeywords.length / dept.keywords.length) * 100), foundKeywords, missingKeywords: dept.keywords.filter(k => !foundKeywords.includes(k)), totalKeywords: dept.keywords.length };
+            
+            // Normaliser le texte du profil pour la recherche
+            const normalizedText = profileText.toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Enlever accents pour comparaison
+                .replace(/[^\w\sàâäéèêëïîôùûüÿæœç-]/gi, ' '); // Garder lettres, chiffres, espaces, tirets
+            
+            const foundKeywords = dept.keywords.filter(keyword => {
+                const normalizedKeyword = keyword.toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                
+                // Créer une regex pour chercher le mot-clé complet (avec limites de mots)
+                // Échapper les caractères spéciaux de regex
+                const escapedKeyword = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp('(^|\\s|-)' + escapedKeyword + '($|\\s|-)', 'i');
+                
+                return regex.test(normalizedText);
+            });
+            
+            return { 
+                score: Math.round((foundKeywords.length / dept.keywords.length) * 100), 
+                foundKeywords, 
+                missingKeywords: dept.keywords.filter(k => !foundKeywords.includes(k)), 
+                totalKeywords: dept.keywords.length 
+            };
         }
 
         function quickAdd() {
@@ -712,14 +424,10 @@
                 </div>`;
             }
             
-            html += `<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button onclick="quickAdd()" class="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-lg">
                     <div class="font-bold">⚡ Coller le texte</div>
                     <div class="text-xs opacity-90">Copier-coller le profil LinkedIn</div>
-                </button>
-                <button onclick="openFileModal()" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-lg hover:from-indigo-700 hover:to-purple-700 shadow-lg">
-                    <div class="font-bold">📄 Importer un fichier</div>
-                    <div class="text-xs opacity-90">PDF ou capture d'écran</div>
                 </button>
                 <button onclick="state.currentView = 'add'; render();" class="bg-white border-2 border-gray-300 text-gray-700 py-4 rounded-lg hover:bg-gray-50">
                     <div class="font-bold">➕ Saisie manuelle</div>
@@ -729,13 +437,11 @@
             
             html += '<div class="grid gap-4">';
             state.employees.forEach(emp => {
-                const importBadge = emp.importedFrom === 'file' ? '<span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded ml-2">📄</span>' : '';
                 html += `<div class="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
                             <div class="flex items-center gap-2">
                                 <h3 class="text-lg font-semibold text-gray-900">${emp.firstName} ${emp.lastName}</h3>
-                                ${importBadge}
                                 ${emp.email ? '<span class="text-sm">📧</span>' : ''}
                                 ${emp.linkedinUrl && isValidLinkedInURL(emp.linkedinUrl) ? '<span class="text-sm">🔗</span>' : ''}
                             </div>
