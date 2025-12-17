@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analyseur LinkedIn - ADN de Marque Cyrus Herez</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Barlow', sans-serif; }
@@ -21,16 +20,40 @@
         .progress-gradient-yellow { background: linear-gradient(90deg, #eab308, #ca8a04); }
         .progress-gradient-orange { background: linear-gradient(90deg, #f97316, #ea580c); }
         .progress-gradient-red { background: linear-gradient(90deg, #ef4444, #dc2626); }
-        .progress-gradient-blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
-        .progress-gradient-purple { background: linear-gradient(90deg, #8b5cf6, #7c3aed); }
         .bg-cyrus-dark { background-color: var(--cyrus-dark); }
         .bg-cyrus-gold { background-color: var(--cyrus-gold); }
         .bg-cyrus-light { background-color: var(--cyrus-light); }
         .text-cyrus-dark { color: var(--cyrus-dark); }
         .text-cyrus-gold { color: var(--cyrus-gold); }
         .border-cyrus-gold { border-color: var(--cyrus-gold); }
-        .border-cyrus-dark { border-color: var(--cyrus-dark); }
-        @media print { .no-print { display: none !important; } }
+        
+        /* Styles pour l'impression PDF */
+        @media print {
+            body { 
+                background: white !important; 
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .no-print { display: none !important; }
+            .print-break { page-break-before: always; }
+            .print-avoid-break { page-break-inside: avoid; }
+            .progress-fill { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .bg-green-100, .bg-red-100, .bg-yellow-100, .bg-orange-100, .bg-blue-100 {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            header { 
+                position: relative !important;
+                -webkit-print-color-adjust: exact !important;
+            }
+            main { padding: 10px !important; }
+            .shadow-sm, .shadow-lg { box-shadow: none !important; }
+        }
+        
+        @page {
+            size: A4;
+            margin: 10mm;
+        }
     </style>
 </head>
 <body>
@@ -56,7 +79,6 @@
                 { group: "Produits structurés", keywords: ["produits structurés", "produit structuré"] },
                 { group: "Non coté", keywords: ["non coté", "non-coté"] }
             ],
-            // ===== NOUVEAUX MOTS-CLÉS MÉTIER =====
             departments: [
                 { 
                     id: 1, 
@@ -166,7 +188,7 @@
 
         function loadState() {
             try {
-                const saved = localStorage.getItem('employees_v5');
+                const saved = localStorage.getItem('employees_v6');
                 if (saved) state.employees = JSON.parse(saved);
             } catch (e) {
                 console.error('Error loading state:', e);
@@ -174,7 +196,7 @@
         }
 
         function saveState() {
-            localStorage.setItem('employees_v5', JSON.stringify(state.employees));
+            localStorage.setItem('employees_v6', JSON.stringify(state.employees));
         }
 
         function processText(text) {
@@ -202,7 +224,6 @@
             return /linkedin\.com\/in\/[^\/\?]+/.test(url);
         }
 
-        // ===== ANALYSE URL LINKEDIN =====
         function analyzeLinkedInURL(url, firstName, lastName, position) {
             const username = extractLinkedInUsername(url);
             if (!username) return { score: 0, maxScore: 10, details: [], issues: ['URL LinkedIn non fournie'] };
@@ -212,54 +233,43 @@
             let score = 0;
             const maxScore = 10;
             
-            // 1. Vérifier les accents dans l'URL (3 pts)
             const hasAccents = /[àâäéèêëïîôùûüÿæœç]/i.test(username);
             if (!hasAccents) {
                 score += 3;
-                details.push('✓ Pas d\'accent dans l\'URL');
+                details.push('Pas d\'accent dans l\'URL');
             } else {
                 issues.push('Accents détectés dans l\'URL');
             }
             
-            // 2. Vérifier le nom/prénom (4 pts)
             const normalizedUsername = removeAccents(username.toLowerCase().replace(/[-_]/g, ' '));
             const normalizedFirstName = removeAccents((firstName || '').toLowerCase());
             const normalizedLastName = removeAccents((lastName || '').toLowerCase());
             
-            let nameScore = 0;
             if (normalizedFirstName && normalizedUsername.includes(normalizedFirstName)) {
-                nameScore += 2;
-                details.push('✓ Prénom présent dans l\'URL');
+                score += 2;
+                details.push('Prénom présent');
             } else if (normalizedFirstName) {
-                issues.push('Prénom absent ou mal orthographié dans l\'URL');
+                issues.push('Prénom absent ou mal orthographié');
             }
             
             if (normalizedLastName && normalizedUsername.includes(normalizedLastName)) {
-                nameScore += 2;
-                details.push('✓ Nom présent dans l\'URL');
+                score += 2;
+                details.push('Nom présent');
             } else if (normalizedLastName) {
-                issues.push('Nom absent ou mal orthographié dans l\'URL');
+                issues.push('Nom absent ou mal orthographié');
             }
-            score += nameScore;
             
-            // 3. Vérifier le poste (3 pts)
             if (position) {
                 const positionWords = position.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-                const positionInUrl = positionWords.some(word => normalizedUsername.includes(removeAccents(word)));
+                const jobTerms = ['gerant', 'conseiller', 'directeur', 'manager', 'patrimoine', 'finance', 'wealth', 'private', 'banker'];
+                const positionInUrl = positionWords.some(word => normalizedUsername.includes(removeAccents(word))) ||
+                                     jobTerms.some(term => normalizedUsername.includes(term));
                 
                 if (positionInUrl) {
                     score += 3;
-                    details.push('✓ Poste présent dans l\'URL');
+                    details.push('Poste/métier présent');
                 } else {
-                    // Vérifier des termes métier courants
-                    const jobTerms = ['gerant', 'conseiller', 'directeur', 'manager', 'patrimoine', 'finance', 'wealth'];
-                    const hasJobTerm = jobTerms.some(term => normalizedUsername.includes(term));
-                    if (hasJobTerm) {
-                        score += 2;
-                        details.push('✓ Terme métier dans l\'URL');
-                    } else {
-                        issues.push('Poste/métier absent de l\'URL');
-                    }
+                    issues.push('Poste/métier absent de l\'URL');
                 }
             }
             
@@ -333,7 +343,6 @@
             return '🔴';
         }
 
-        // ===== CALCUL MOYENNE SSI DYNAMIQUE =====
         function getAverageSSI() {
             if (state.employees.length === 0) return 0;
             const total = state.employees.reduce((sum, emp) => sum + (emp.ssiScore || 0), 0);
@@ -341,16 +350,13 @@
         }
 
         function getSectorRanking(score) {
-            const avgSSI = getAverageSSI();
-            if (avgSSI === 0) return 50;
-            
-            // Calculer le rang par rapport aux autres profils
+            if (state.employees.length <= 1) return 50;
             const betterCount = state.employees.filter(emp => (emp.ssiScore || 0) > score).length;
             const ranking = Math.round((betterCount / state.employees.length) * 100);
             return Math.max(1, Math.min(99, ranking + 1));
         }
 
-        // ===== NOUVEAU CALCUL ADN CYRUS HEREZ =====
+        // ===== ANALYSE ADN =====
         function analyzeADN(profileText) {
             const normalizedText = normalizeText(profileText);
             const wordCount = processText(profileText).length;
@@ -373,14 +379,7 @@
             
             const globalScore = Math.round((foundGroups.length / totalGroups) * 100);
             
-            return { 
-                globalScore, 
-                foundGroups, 
-                missingGroups, 
-                totalGroups,
-                wordCount, 
-                analyzedAt: new Date().toISOString() 
-            };
+            return { globalScore, foundGroups, missingGroups, totalGroups, wordCount, analyzedAt: new Date().toISOString() };
         }
 
         // ===== SCORE SSI =====
@@ -389,33 +388,27 @@
             const words = processText(profileText);
             const wordCount = words.length;
             
-            // 1. Marque professionnelle (25 pts)
             let brandScore = 0;
-            let brandDetails = { hasName: false, hasPosition: false, hasContent: false, hasExpertise: false };
-            if (employee.firstName && employee.lastName) { brandScore += 5; brandDetails.hasName = true; }
-            if (employee.position) { brandScore += 5; brandDetails.hasPosition = true; }
-            if (wordCount >= 200) { brandScore += 10; brandDetails.hasContent = true; }
-            else if (wordCount >= 100) { brandScore += 5; brandDetails.hasContent = true; }
-            if (text.includes('expert') || text.includes('spécialiste') || text.includes('passion')) { brandScore += 5; brandDetails.hasExpertise = true; }
+            if (employee.firstName && employee.lastName) brandScore += 5;
+            if (employee.position) brandScore += 5;
+            if (wordCount >= 200) brandScore += 10;
+            else if (wordCount >= 100) brandScore += 5;
+            if (text.includes('expert') || text.includes('spécialiste') || text.includes('passion')) brandScore += 5;
             
-            // 2. Trouver les bonnes personnes (25 pts)
             const networkKeywords = ['réseau', 'network', 'professionnel', 'contact', 'relation', 'partenaire', 'collaboration'];
             const foundNetworkKeywords = networkKeywords.filter(k => text.includes(k));
             const peopleScore = Math.min(25, foundNetworkKeywords.length * 4);
             
-            // 3. Échanger des informations (25 pts)
             const engageKeywords = ['partage', 'publication', 'article', 'insight', 'analyse', 'expertise', 'conseil', 'contribution'];
             const foundEngageKeywords = engageKeywords.filter(k => text.includes(k));
             const engagementScore = Math.min(25, foundEngageKeywords.length * 3.5);
             
-            // 4. Établir des relations (25 pts)
             const relationKeywords = ['accompagnement', 'écoute', 'client', 'confiance', 'long-terme', 'long terme', 'fidélité', 'suivi', 'proximité', 'partenariat', 'relation durable', 'sur-mesure', 'personnalisé'];
             const foundRelationKeywords = relationKeywords.filter(k => text.includes(k));
             const relationScore = Math.min(25, foundRelationKeywords.length * 3);
             
             const ssiScore = Math.round(brandScore + peopleScore + engagementScore + relationScore);
             
-            // Points forts et à améliorer
             const ssiStrengths = [];
             const ssiWeaknesses = [];
             
@@ -431,7 +424,6 @@
             if (relationScore >= 15) ssiStrengths.push({ icon: '🤝', label: 'Établir des relations' });
             else ssiWeaknesses.push({ icon: '🤝', label: 'Établir des relations', priority: relationScore < 8 ? 'haute' : 'moyenne' });
             
-            // Analyse URL LinkedIn
             const urlAnalysis = analyzeLinkedInURL(employee.linkedinUrl, employee.firstName, employee.lastName, employee.position);
             
             return { 
@@ -440,13 +432,7 @@
                 ssiPeopleScore: Math.round(peopleScore), 
                 ssiEngagementScore: Math.round(engagementScore), 
                 ssiRelationScore: Math.round(relationScore), 
-                ssiRelationKeywordsFound: foundRelationKeywords,
-                ssiNetworkKeywordsFound: foundNetworkKeywords,
-                ssiEngageKeywordsFound: foundEngageKeywords,
-                ssiStrengths,
-                ssiWeaknesses,
-                ssiBrandDetails: brandDetails,
-                // URL Analysis
+                ssiStrengths, ssiWeaknesses,
                 ssiUrlScore: urlAnalysis.score,
                 ssiUrlMaxScore: urlAnalysis.maxScore,
                 ssiUrlDetails: urlAnalysis.details,
@@ -461,18 +447,11 @@
             const normalizedText = normalizeText(text);
             const wordCount = processText(profileText).length;
             
-            // 1. IDENTITÉ & CRÉDIBILITÉ (15 pts)
             let photoScore = 0;
-            const photoIndicators = ['photo', 'image', 'profil', 'portrait'];
-            const hasPhotoMention = photoIndicators.some(p => text.includes(p));
-            if (hasPhotoMention || wordCount > 150) photoScore = 3;
+            if (wordCount > 150) photoScore = 3;
             else if (wordCount > 80) photoScore = 2;
             
-            let bannerScore = 0;
-            const bannerIndicators = ['bannière', 'banner', 'arrière-plan', 'background', 'couverture'];
-            const hasBannerMention = bannerIndicators.some(b => text.includes(b));
-            if (hasBannerMention) bannerScore = 2;
-            else if (wordCount > 200) bannerScore = 1;
+            let bannerScore = wordCount > 200 ? 1 : 0;
             
             let headlineScore = 0;
             const hasCyrusHerez = text.includes('cyrus herez') || text.includes('cyrus-herez');
@@ -491,242 +470,142 @@
             
             const identityScore = photoScore + bannerScore + headlineScore + locationScore;
             
-            // 2. PROPOSITION DE VALEUR (20 pts)
-            let valuePropositionKeywordsFound = [];
-            let valuePropositionKeywordsMissing = [];
-            
+            let valueKeywordsFound = [];
             state.adnKeywords.forEach(group => {
                 const normalizedKeywords = group.keywords.map(k => normalizeText(k));
                 const found = normalizedKeywords.some(kw => normalizedText.includes(kw));
-                const foundKeyword = group.keywords.find(kw => normalizedText.includes(normalizeText(kw)));
-                
-                if (found) {
-                    valuePropositionKeywordsFound.push({ group: group.group, keyword: foundKeyword });
-                } else {
-                    valuePropositionKeywordsMissing.push(group.group);
-                }
+                if (found) valueKeywordsFound.push(group.group);
             });
             
-            const valueRatio = valuePropositionKeywordsFound.length / state.adnKeywords.length;
+            const valueRatio = valueKeywordsFound.length / state.adnKeywords.length;
             let summaryScore = Math.round(valueRatio * 10);
             
             const hasNumbers = /\d+/.test(text);
             const hasResults = ['résultat', 'impact', 'réalis', 'atteint', 'développ', 'augment', 'réduit', 'optimis', 'amélio', 'généré'].some(r => normalizedText.includes(r));
             if (hasNumbers && hasResults) summaryScore = Math.min(10, summaryScore + 2);
             
-            let coherenceScore = 0;
             const deptKeywordsFound = employee.deptFoundKeywords?.length || 0;
-            const deptTotal = employee.deptTotalKeywords || 1;
-            const coherenceRatio = deptKeywordsFound / deptTotal;
-            
-            if (coherenceRatio >= 0.25) coherenceScore = 10;
-            else if (coherenceRatio >= 0.15) coherenceScore = 7;
-            else if (coherenceRatio >= 0.08) coherenceScore = 5;
-            else coherenceScore = 2;
+            let coherenceScore = deptKeywordsFound >= 10 ? 10 : deptKeywordsFound >= 5 ? 7 : deptKeywordsFound >= 2 ? 5 : 2;
             
             const positioningScore = summaryScore + coherenceScore;
             
-            // 3. EXPÉRIENCE (25 pts)
-            let experienceDetailScore = 0;
             const expKeywords = ['expérience', 'experience', 'poste', 'mission', 'responsab', 'projet', 'équipe', 'manage', 'pilote', 'développ'];
             const hasExpDetail = expKeywords.filter(k => normalizedText.includes(k)).length;
             const hasMetrics = /(\d+\s*%|\d+\s*[kKmM]?€|\d+\s*clients?|\d+\s*personnes?|\d+\s*projets?)/.test(text);
             const hasImpact = ['augment', 'réduit', 'créé', 'lancé', 'négoci', 'signé', 'généré', 'optimis'].some(i => normalizedText.includes(i));
             
+            let experienceDetailScore = 3;
             if (hasExpDetail >= 4 && hasMetrics && hasImpact) experienceDetailScore = 15;
             else if (hasExpDetail >= 3 && (hasMetrics || hasImpact)) experienceDetailScore = 12;
             else if (hasExpDetail >= 2 && hasMetrics) experienceDetailScore = 10;
             else if (hasExpDetail >= 2) experienceDetailScore = 8;
             else if (hasExpDetail >= 1) experienceDetailScore = 5;
-            else experienceDetailScore = 3;
             
-            let progressionScore = 0;
             const seniorityTerms = ['junior', 'confirmé', 'senior', 'lead', 'manager', 'head', 'directeur', 'vp', 'chief', 'partner', 'associé'];
-            const progressionTerms = ['promu', 'évolution', 'progression', 'nommé', 'devenu', 'promotion'];
             const yearsPattern = /(\d+)\s*ans?/g;
             const yearsMatches = [...normalizedText.matchAll(yearsPattern)];
             const hasLongExp = yearsMatches.some(m => parseInt(m[1]) >= 5);
             const hasSeniority = seniorityTerms.filter(s => normalizedText.includes(s)).length >= 2;
-            const hasProgression = progressionTerms.some(p => normalizedText.includes(p));
             
-            if (hasProgression && hasSeniority) progressionScore = 10;
-            else if (hasLongExp && hasSeniority) progressionScore = 8;
+            let progressionScore = 3;
+            if (hasLongExp && hasSeniority) progressionScore = 8;
             else if (hasSeniority || hasLongExp) progressionScore = 6;
-            else if (hasProgression) progressionScore = 5;
-            else progressionScore = 3;
             
             const experienceScore = experienceDetailScore + progressionScore;
             
-            // 4. COMPÉTENCES (20 pts)
-            let skillsScore = 0;
-            const skillsKeywords = ['compétence', 'skill', 'expertise', 'maîtrise', 'connaissance', 'savoir-faire', 'spécialité'];
-            const toolsFound = employee.atsFoundTools?.length || 0;
+            const skillsKeywords = ['compétence', 'skill', 'expertise', 'maîtrise', 'connaissance', 'savoir-faire'];
             const hasSkillsSection = skillsKeywords.some(s => normalizedText.includes(s));
+            let skillsScore = hasSkillsSection && deptKeywordsFound >= 5 ? 8 : deptKeywordsFound >= 3 ? 6 : 4;
             
-            if (toolsFound >= 5 && hasSkillsSection) skillsScore = 10;
-            else if (toolsFound >= 3 || (hasSkillsSection && deptKeywordsFound >= 5)) skillsScore = 8;
-            else if (toolsFound >= 1 || deptKeywordsFound >= 3) skillsScore = 6;
-            else if (hasSkillsSection) skillsScore = 4;
-            else skillsScore = 2;
-            
-            let validationScore = 0;
             const recoMatch = normalizedText.match(/(\d+)\s*recommandation/i);
             const recoCount = recoMatch ? parseInt(recoMatch[1]) : 0;
-            const endorsementKeywords = ['validé', 'endorsed', 'recommand', 'témoign', 'référence'];
-            const hasEndorsements = endorsementKeywords.some(e => normalizedText.includes(e));
-            
-            if (recoCount >= 5 && hasEndorsements) validationScore = 10;
-            else if (recoCount >= 3 || hasEndorsements) validationScore = 7;
-            else if (recoCount >= 1) validationScore = 5;
+            let validationScore = recoCount >= 5 ? 10 : recoCount >= 3 ? 7 : recoCount >= 1 ? 5 : 0;
             
             const competenceScore = skillsScore + validationScore;
             
-            // 5. ENGAGEMENT (10 pts)
-            let activityScore = 0;
-            const activityKeywords = ['publication', 'article', 'post', 'partag', 'écrit', 'publi', 'auteur', 'contributeur'];
+            const activityKeywords = ['publication', 'article', 'post', 'partag', 'écrit', 'publi', 'auteur'];
             const foundActivityKeywords = activityKeywords.filter(a => normalizedText.includes(a));
+            let activityScore = foundActivityKeywords.length >= 3 ? 5 : foundActivityKeywords.length >= 1 ? 3 : 0;
             
-            if (foundActivityKeywords.length >= 3) activityScore = 5;
-            else if (foundActivityKeywords.length >= 1) activityScore = 3;
+            const followerPatterns = [/([\d\s\u00A0.,]+)\s*abonn[ée]s?/i, /([\d\s\u00A0.,]+)\s*followers?/i];
+            const connexionPatterns = [/([\d\s\u00A0.,]+)\s*(?:relations?|connexions?|contacts?)/i];
             
-            let networkScore = 0;
             const extractNumber = (text, patterns) => {
                 for (const pattern of patterns) {
                     const match = text.match(pattern);
-                    if (match) {
-                        const numStr = match[1].replace(/[\s\u00A0\.]/g, '').replace(',', '');
-                        return parseInt(numStr) || 0;
-                    }
+                    if (match) return parseInt(match[1].replace(/[\s\u00A0\.]/g, '').replace(',', '')) || 0;
                 }
                 return 0;
             };
             
-            const followerPatterns = [/([\d\s\u00A0.,]+)\s*abonn[ée]s?/i, /([\d\s\u00A0.,]+)\s*followers?/i];
-            const connexionPatterns = [/([\d\s\u00A0.,]+)\s*(?:relations?|connexions?|contacts?)/i, /plus de\s*([\d\s\u00A0.,]+)\s*(?:relations?|connexions?)/i];
-            
-            const followersCount = extractNumber(text, followerPatterns);
-            const connexionsCount = extractNumber(text, connexionPatterns);
-            const networkCount = Math.max(followersCount, connexionsCount);
-            
-            if (networkCount >= 10000) networkScore = 5;
-            else if (networkCount >= 500 || text.includes('plus de 500')) networkScore = 5;
-            else if (networkCount >= 200) networkScore = 4;
-            else if (networkCount >= 100) networkScore = 3;
-            else if (networkCount > 0) networkScore = 2;
-            else networkScore = 1;
+            const networkCount = Math.max(extractNumber(text, followerPatterns), extractNumber(text, connexionPatterns));
+            let networkScore = networkCount >= 500 || text.includes('plus de 500') ? 5 : networkCount >= 200 ? 4 : networkCount >= 100 ? 3 : 1;
             
             const engagementScore = activityScore + networkScore;
             
-            // 6. FORMATION (10 pts)
-            let educationScore = 0;
-            const educationKeywords = ['diplôme', 'master', 'licence', 'bachelor', 'ingénieur', 'école', 'université', 'bac+', 'formation', 'mba', 'doctorat', 'phd'];
-            const prestigeSchools = ['hec', 'essec', 'escp', 'edhec', 'polytechnique', 'centrale', 'mines', 'dauphine', 'sciences po', 'insead', 'em lyon'];
+            const educationKeywords = ['diplôme', 'master', 'licence', 'bachelor', 'ingénieur', 'école', 'université', 'bac+', 'formation', 'mba'];
+            const prestigeSchools = ['hec', 'essec', 'escp', 'edhec', 'polytechnique', 'centrale', 'mines', 'dauphine', 'sciences po'];
             const hasEducation = educationKeywords.filter(e => normalizedText.includes(e)).length;
             const hasPrestige = prestigeSchools.some(s => normalizedText.includes(s));
+            let educationScore = hasPrestige ? 5 : hasEducation >= 2 ? 5 : hasEducation >= 1 ? 3 : 0;
             
-            if (hasPrestige) educationScore = 5;
-            else if (hasEducation >= 2) educationScore = 5;
-            else if (hasEducation >= 1) educationScore = 3;
-            
-            let certScore = 0;
-            const certKeywords = ['certifi', 'certified', 'certification', 'accrédité', 'agréé', 'habilité', 'cfa', 'amf', 'cgp', 'cif', 'iobsp'];
+            const certKeywords = ['certifi', 'certification', 'accrédité', 'agréé', 'cfa', 'amf', 'cgp', 'cif', 'iobsp'];
             const hasCerts = certKeywords.filter(c => normalizedText.includes(c)).length;
-            
-            if (hasCerts >= 3) certScore = 5;
-            else if (hasCerts >= 1) certScore = 4;
+            let certScore = hasCerts >= 3 ? 5 : hasCerts >= 1 ? 4 : 0;
             
             const formationScore = educationScore + certScore;
             
-            // SCORE TOTAL
             const linkedinGlobalScore = Math.min(100, identityScore + positioningScore + experienceScore + competenceScore + engagementScore + formationScore);
             
-            // RÈGLES NO-GO
             const noGoReasons = [];
             if (!hasCyrusHerez) noGoReasons.push("'Cyrus Herez' absent du titre");
             if (experienceDetailScore < 5) noGoReasons.push("Expériences non détaillées");
             if (headlineScore < 2) noGoReasons.push("Titre non professionnel");
-            if (valuePropositionKeywordsFound.length < 3) noGoReasons.push("Proposition de valeur incomplète");
+            if (valueKeywordsFound.length < 3) noGoReasons.push("Proposition de valeur incomplète");
             if (wordCount < 50) noGoReasons.push("Profil trop succinct");
             
             const isNoGo = noGoReasons.length >= 2;
             const finalScore = isNoGo ? Math.min(29, linkedinGlobalScore) : linkedinGlobalScore;
             
             let linkedinLevel, linkedinVerdict;
-            if (isNoGo) {
-                linkedinLevel = "🔴 Non pertinent";
-                linkedinVerdict = "Profil éliminé (règles No-Go)";
-            } else if (finalScore >= 85) {
-                linkedinLevel = "🏆 Expert";
-                linkedinVerdict = "Profil hautement pertinent";
-            } else if (finalScore >= 70) {
-                linkedinLevel = "✅ Solide";
-                linkedinVerdict = "Profil solide et exploitable";
-            } else if (finalScore >= 50) {
-                linkedinLevel = "⚠️ Moyen";
-                linkedinVerdict = "Profil à approfondir";
-            } else if (finalScore >= 30) {
-                linkedinLevel = "🟠 Faible";
-                linkedinVerdict = "Profil peu différenciant";
-            } else {
-                linkedinLevel = "🔴 Insuffisant";
-                linkedinVerdict = "Profil non pertinent";
-            }
+            if (isNoGo) { linkedinLevel = "🔴 Non pertinent"; linkedinVerdict = "Profil éliminé (règles No-Go)"; }
+            else if (finalScore >= 85) { linkedinLevel = "🏆 Expert"; linkedinVerdict = "Profil hautement pertinent"; }
+            else if (finalScore >= 70) { linkedinLevel = "✅ Solide"; linkedinVerdict = "Profil solide et exploitable"; }
+            else if (finalScore >= 50) { linkedinLevel = "⚠️ Moyen"; linkedinVerdict = "Profil à approfondir"; }
+            else if (finalScore >= 30) { linkedinLevel = "🟠 Faible"; linkedinVerdict = "Profil peu différenciant"; }
+            else { linkedinLevel = "🔴 Insuffisant"; linkedinVerdict = "Profil non pertinent"; }
             
-            // Points forts LinkedIn Pro
             const linkedinStrengths = [];
             const linkedinWeaknesses = [];
             
             if (identityScore >= 10) linkedinStrengths.push({ icon: '🆔', label: 'Identité & Crédibilité' });
-            else linkedinWeaknesses.push({ icon: '🆔', label: 'Identité & Crédibilité', tips: ['Ajouter Cyrus Herez au titre', 'Compléter la localisation'] });
+            else linkedinWeaknesses.push({ icon: '🆔', label: 'Identité & Crédibilité' });
             
             if (positioningScore >= 14) linkedinStrengths.push({ icon: '🎯', label: 'Proposition de valeur' });
-            else linkedinWeaknesses.push({ icon: '🎯', label: 'Proposition de valeur', tips: ['Enrichir le résumé avec les mots-clés ADN', 'Ajouter des résultats chiffrés'] });
+            else linkedinWeaknesses.push({ icon: '🎯', label: 'Proposition de valeur' });
             
             if (experienceScore >= 18) linkedinStrengths.push({ icon: '💼', label: 'Expérience professionnelle' });
-            else linkedinWeaknesses.push({ icon: '💼', label: 'Expérience professionnelle', tips: ['Détailler les missions avec des métriques', 'Montrer la progression de carrière'] });
+            else linkedinWeaknesses.push({ icon: '💼', label: 'Expérience professionnelle' });
             
             if (competenceScore >= 14) linkedinStrengths.push({ icon: '⭐', label: 'Compétences & Expertise' });
-            else linkedinWeaknesses.push({ icon: '⭐', label: 'Compétences & Expertise', tips: ['Ajouter des compétences clés', 'Obtenir des recommandations'] });
+            else linkedinWeaknesses.push({ icon: '⭐', label: 'Compétences & Expertise' });
             
             if (engagementScore >= 7) linkedinStrengths.push({ icon: '📢', label: 'Engagement & Visibilité' });
-            else linkedinWeaknesses.push({ icon: '📢', label: 'Engagement & Visibilité', tips: ['Publier du contenu régulièrement', 'Développer son réseau'] });
+            else linkedinWeaknesses.push({ icon: '📢', label: 'Engagement & Visibilité' });
             
             if (formationScore >= 7) linkedinStrengths.push({ icon: '🎓', label: 'Formation & Académique' });
-            else linkedinWeaknesses.push({ icon: '🎓', label: 'Formation & Académique', tips: ['Ajouter les certifications', 'Compléter le parcours académique'] });
+            else linkedinWeaknesses.push({ icon: '🎓', label: 'Formation & Académique' });
             
             return { 
-                linkedinGlobalScore: finalScore,
-                linkedinLevel,
-                linkedinVerdict,
-                linkedinIsNoGo: isNoGo,
-                linkedinNoGoReasons: noGoReasons,
-                linkedinIdentityScore: identityScore,
-                linkedinPhotoScore: photoScore,
-                linkedinBannerScore: bannerScore,
-                linkedinHeadlineScore: headlineScore,
-                linkedinHasCyrusHerez: hasCyrusHerez,
-                linkedinLocationScore: locationScore,
+                linkedinGlobalScore: finalScore, linkedinLevel, linkedinVerdict,
+                linkedinIsNoGo: isNoGo, linkedinNoGoReasons: noGoReasons,
+                linkedinIdentityScore: identityScore, linkedinHasCyrusHerez: hasCyrusHerez,
                 linkedinPositioningScore: positioningScore,
-                linkedinSummaryScore: summaryScore,
-                linkedinCoherenceScore: coherenceScore,
                 linkedinExperienceScore: experienceScore,
-                linkedinExpDetailScore: experienceDetailScore,
-                linkedinProgressionScore: progressionScore,
                 linkedinCompetenceScore: competenceScore,
-                linkedinSkillsScore: skillsScore,
-                linkedinValidationScore: validationScore,
                 linkedinEngagementScore: engagementScore,
-                linkedinActivityScore: activityScore,
-                linkedinNetworkScore: networkScore,
                 linkedinFormationScore: formationScore,
-                linkedinEducationScore: educationScore,
-                linkedinCertScore: certScore,
-                linkedinFollowersCount: followersCount,
-                linkedinConnexionsCount: connexionsCount,
-                linkedinValueKeywordsFound: valuePropositionKeywordsFound,
-                linkedinValueKeywordsMissing: valuePropositionKeywordsMissing,
-                linkedinStrengths,
-                linkedinWeaknesses
+                linkedinStrengths, linkedinWeaknesses
             };
         }
 
@@ -737,9 +616,7 @@
             
             const seniorTitles = ['directeur', 'director', 'head', 'lead', 'responsable', 'manager', 'chief', 'vp', 'associé', 'partner', 'gérant'];
             const hasSeniorTitle = seniorTitles.some(t => normalizedText.includes(t));
-            const titleMatch = employee.position ? 12 : 0;
-            const seniorBonus = hasSeniorTitle ? 8 : 0;
-            const titleFit = Math.min(20, titleMatch + seniorBonus);
+            const titleFit = Math.min(20, (employee.position ? 12 : 0) + (hasSeniorTitle ? 8 : 0));
             
             const toolsKeywords = ['salesforce', 'hubspot', 'excel', 'bloomberg', 'reuters', 'power bi', 'sap', 'oracle'];
             const foundTools = toolsKeywords.filter(t => normalizedText.includes(t));
@@ -756,25 +633,16 @@
                 }
             });
             
-            const progressionKeywords = ['évolution', 'promotion', 'promu', 'devenu', 'nommé'];
-            const hasProgression = progressionKeywords.some(p => normalizedText.includes(p));
-            const yearsScore = Math.min(10, totalYears >= 10 ? 10 : totalYears >= 5 ? 7 : totalYears >= 2 ? 4 : 2);
-            const progressionBonus = hasProgression ? 5 : (hasSeniorTitle ? 3 : 0);
-            const seniorityFit = Math.min(15, yearsScore + progressionBonus);
+            const yearsScore = totalYears >= 10 ? 10 : totalYears >= 5 ? 7 : totalYears >= 2 ? 4 : 2;
+            const seniorityFit = Math.min(15, yearsScore + (hasSeniorTitle ? 3 : 0));
             
-            const kpiPatterns = [/[+\-]?\d+(?:[,\.]\d+)?\s*%/g, /\d+(?:[,\.]\d+)?\s*[kKmM]?€/g, /\d+\s*(?:clients?|comptes?|dossiers?|projets?)/gi, /(?:aum|encours|portefeuille)[\s:]*\d+/gi];
+            const kpiPatterns = [/[+\-]?\d+(?:[,\.]\d+)?\s*%/g, /\d+(?:[,\.]\d+)?\s*[kKmM]?€/g, /\d+\s*(?:clients?|comptes?|dossiers?|projets?)/gi];
             let kpiCount = 0;
-            const kpiMatches = [];
-            kpiPatterns.forEach(pattern => {
-                const matches = normalizedText.match(pattern) || [];
-                kpiCount += matches.length;
-                matches.forEach(m => kpiMatches.push(m));
-            });
+            kpiPatterns.forEach(pattern => { kpiCount += (normalizedText.match(pattern) || []).length; });
             
             const impactWords = ['augment', 'croissance', 'amélio', 'réduit', 'optimis', 'génér', 'atteint', 'dépass'];
             const hasImpactContext = impactWords.some(w => normalizedText.includes(w));
-            const kpiQuality = hasImpactContext ? 1 : (kpiCount > 0 ? 0.5 : 0);
-            const impactKPI = Math.min(25, Math.round(5 * Math.log1p(kpiCount) + 15 * kpiQuality));
+            const impactKPI = Math.min(25, Math.round(5 * Math.log1p(kpiCount) + 15 * (hasImpactContext ? 1 : 0.5)));
             
             const recoMatch = normalizedText.match(/(\d+)\s*recommandation/i);
             const recoCount = recoMatch ? parseInt(recoMatch[1]) : 0;
@@ -783,11 +651,7 @@
             const credibility = Math.min(15, Math.round(Math.min(5, recoCount) + certCount * 1.5 + 2));
             
             const sectorKeywords = ['finance', 'banque', 'patrimoine', 'gestion', 'investissement', 'conseil', 'immobilier'];
-            const hasSector = sectorKeywords.some(s => normalizedText.includes(s));
-            const contextFit = hasSector ? 10 : 4;
-            
-            const deptScore = employee.deptScore || 0;
-            const keywordFitNormalized = (deptScore / 100) * 20;
+            const contextFit = sectorKeywords.some(s => normalizedText.includes(s)) ? 10 : 4;
             
             const rawScore = 
                 (titleFit / 20) * 100 * 0.15 +
@@ -796,7 +660,7 @@
                 (impactKPI / 25) * 100 * 0.25 +
                 (credibility / 15) * 100 * 0.15 +
                 (contextFit / 10) * 100 * 0.10 +
-                (keywordFitNormalized / 20) * 100 * 0.12;
+                ((employee.deptScore || 0) / 100) * 20 * 0.12;
             
             const atsScore = Math.round(rawScore);
             
@@ -806,27 +670,19 @@
             else if (atsScore >= 40) atsDecision = "🟠 En attente";
             else atsDecision = "🔴 Non retenu";
             
-            return {
-                atsScore, atsDecision,
-                atsTitleFit: titleFit, atsToolsFit: toolsFit, atsSeniorityFit: seniorityFit,
-                atsImpactKPI: impactKPI, atsCredibility: credibility, atsContextFit: contextFit,
-                atsFoundTools: foundTools, atsKPICount: kpiCount, atsKPIMatches: kpiMatches.slice(0, 10),
-                atsTotalYears: totalYears, atsHasProgression: hasProgression, atsCertCount: certCount, atsRecoCount: recoCount
-            };
+            return { atsScore, atsDecision, atsFoundTools: foundTools, atsTotalYears: totalYears };
         }
 
-        // ===== SCORE MÉTIER PONDÉRÉ =====
+        // ===== SCORE MÉTIER =====
         function calculateDeptScore(profileText, deptName) {
             const dept = state.departments.find(d => d.name === deptName);
             if (!dept || !dept.sections) return { 
-                score: 0, foundKeywords: [], missingKeywords: [], totalKeywords: 0,
-                sectionDetails: [], weightedScore: 0, rawScore: 0
+                score: 0, foundKeywords: [], missingKeywords: [], totalKeywords: 0, sectionDetails: []
             };
             
             const normalizedText = normalizeText(profileText);
             
             let totalWeightedPoints = 0;
-            let maxWeightedPoints = 0;
             let allFoundKeywords = [];
             let allMissingKeywords = [];
             let sectionDetails = [];
@@ -848,12 +704,8 @@
                 });
                 
                 totalKeywords += section.keywords.length;
-                
                 const sectionPoints = foundInSection.length * section.weight;
-                const sectionMaxPoints = section.keywords.length * section.weight;
-                
                 totalWeightedPoints += sectionPoints;
-                maxWeightedPoints += sectionMaxPoints;
                 
                 sectionDetails.push({
                     name: section.name,
@@ -863,26 +715,20 @@
                     foundCount: foundInSection.length,
                     totalCount: section.keywords.length,
                     points: sectionPoints,
-                    maxPoints: sectionMaxPoints
+                    maxPoints: section.keywords.length * section.weight
                 });
             });
             
-            const maxTarget = state.metierMaxKeywords;
-            const avgWeight = 2;
-            const targetWeightedPoints = maxTarget * avgWeight;
-            
+            const targetWeightedPoints = state.metierMaxKeywords * 2;
             const rawScore = Math.min(100, Math.round((totalWeightedPoints / targetWeightedPoints) * 100));
             
             return { 
                 score: rawScore,
                 foundKeywords: allFoundKeywords.map(k => k.keyword),
                 missingKeywords: allMissingKeywords.map(k => k.keyword),
-                totalKeywords,
-                sectionDetails,
+                totalKeywords, sectionDetails,
                 weightedPoints: totalWeightedPoints,
-                maxWeightedPoints: maxWeightedPoints,
                 targetPoints: targetWeightedPoints,
-                foundCount: allFoundKeywords.length,
                 detailedFound: allFoundKeywords,
                 detailedMissing: allMissingKeywords
             };
@@ -890,133 +736,85 @@
 
         // ===== PRÉCONISATIONS =====
         function generateRecommendations(employee) {
-            const recommendations = {
-                ssi: [],
-                linkedin: [],
-                adn: [],
-                metier: [],
-                url: []
-            };
+            const recommendations = { ssi: [], linkedin: [], adn: [], metier: [], url: [] };
             
-            // URL Recommendations
+            // URL
             if (employee.ssiUrlIssues && employee.ssiUrlIssues.length > 0) {
                 recommendations.url.push({
-                    priority: 'haute',
-                    icon: '🔗',
-                    title: 'Optimiser l\'URL LinkedIn',
+                    priority: 'haute', icon: '🔗', title: 'Optimiser l\'URL LinkedIn',
                     actions: employee.ssiUrlIssues.map(issue => `Corriger : ${issue}`)
                 });
             }
             
-            // SSI Recommendations
+            // SSI
             if (employee.ssiBrandScore < 20) {
                 recommendations.ssi.push({
-                    priority: 'haute',
-                    icon: '🏆',
-                    title: 'Améliorer la marque professionnelle',
-                    actions: [
-                        'Enrichir le résumé avec plus de 200 mots',
-                        'Mettre en avant votre expertise et spécialités',
-                        'Ajouter des mots-clés comme "expert", "spécialiste"'
-                    ]
+                    priority: 'haute', icon: '🏆', title: 'Améliorer la marque professionnelle',
+                    actions: ['Enrichir le résumé avec plus de 200 mots', 'Mettre en avant votre expertise', 'Ajouter "expert" ou "spécialiste"']
                 });
             }
             if (employee.ssiPeopleScore < 15) {
                 recommendations.ssi.push({
-                    priority: 'moyenne',
-                    icon: '👥',
-                    title: 'Développer le réseau',
-                    actions: [
-                        'Mentionner vos collaborations et partenariats',
-                        'Utiliser les termes : réseau, professionnel, partenaire',
-                        'Décrire vos interactions avec les contacts clés'
-                    ]
+                    priority: 'moyenne', icon: '👥', title: 'Développer le réseau',
+                    actions: ['Mentionner vos collaborations', 'Utiliser : réseau, professionnel, partenaire', 'Décrire vos interactions clés']
                 });
             }
             if (employee.ssiEngagementScore < 15) {
                 recommendations.ssi.push({
-                    priority: 'moyenne',
-                    icon: '💬',
-                    title: 'Échanger des informations',
-                    actions: [
-                        'Publier des articles et analyses',
-                        'Partager votre expertise et insights',
-                        'Contribuer aux discussions du secteur'
-                    ]
+                    priority: 'moyenne', icon: '💬', title: 'Échanger des informations',
+                    actions: ['Publier des articles', 'Partager votre expertise', 'Contribuer aux discussions']
                 });
             }
             if (employee.ssiRelationScore < 15) {
                 recommendations.ssi.push({
-                    priority: 'haute',
-                    icon: '🤝',
-                    title: 'Construire des relations',
-                    actions: [
-                        'Utiliser InMail pour les prospects stratégiques',
-                        'Organiser ou participer à des LinkedIn Live',
-                        'Créer des sondages pour engager son audience',
-                        'Mettre en avant l\'accompagnement client'
-                    ]
+                    priority: 'haute', icon: '🤝', title: 'Construire des relations',
+                    actions: ['Utiliser InMail stratégiquement', 'Participer à des LinkedIn Live', 'Créer des sondages', 'Mettre en avant l\'accompagnement']
                 });
             }
             
-            // LinkedIn Pro Recommendations
+            // LinkedIn
             if (!employee.linkedinHasCyrusHerez) {
                 recommendations.linkedin.push({
-                    priority: 'haute',
-                    icon: '🆔',
-                    title: 'Ajouter Cyrus Herez au titre',
-                    actions: [
-                        'Modifier le titre pour inclure "Cyrus Herez"',
-                        'Format recommandé : "Poste | Cyrus Herez"'
-                    ]
+                    priority: 'haute', icon: '🆔', title: 'Ajouter Cyrus Herez au titre',
+                    actions: ['Modifier le titre pour inclure "Cyrus Herez"', 'Format : "Poste | Cyrus Herez"']
                 });
             }
             if (employee.linkedinExperienceScore < 18) {
                 recommendations.linkedin.push({
-                    priority: 'moyenne',
-                    icon: '💼',
-                    title: 'Détailler les expériences',
-                    actions: [
-                        'Ajouter des métriques (%, €, clients)',
-                        'Décrire les missions et responsabilités',
-                        'Montrer l\'évolution de carrière'
-                    ]
+                    priority: 'moyenne', icon: '💼', title: 'Détailler les expériences',
+                    actions: ['Ajouter des métriques (%, €, clients)', 'Décrire les missions', 'Montrer l\'évolution']
                 });
             }
             if (employee.linkedinCompetenceScore < 14) {
                 recommendations.linkedin.push({
-                    priority: 'moyenne',
-                    icon: '⭐',
-                    title: 'Renforcer les compétences',
-                    actions: [
-                        'Ajouter les compétences clés du métier',
-                        'Obtenir des recommandations de clients/collègues',
-                        'Valider les compétences techniques'
-                    ]
+                    priority: 'moyenne', icon: '⭐', title: 'Renforcer les compétences',
+                    actions: ['Ajouter les compétences clés', 'Obtenir des recommandations', 'Valider les compétences']
+                });
+            }
+            if (employee.linkedinEngagementScore < 7) {
+                recommendations.linkedin.push({
+                    priority: 'moyenne', icon: '📢', title: 'Augmenter l\'engagement',
+                    actions: ['Publier régulièrement', 'Développer le réseau +500', 'Interagir avec les publications']
                 });
             }
             
-            // ADN Recommendations
+            // ADN
             if (employee.adnMissingGroups && employee.adnMissingGroups.length > 0) {
-                const missingGroups = employee.adnMissingGroups.slice(0, 5);
                 recommendations.adn.push({
-                    priority: employee.globalScore < 50 ? 'haute' : 'moyenne',
-                    icon: '🧬',
-                    title: 'Enrichir le vocabulaire ADN',
-                    actions: missingGroups.map(g => `Ajouter des termes liés à "${g.name}" : ${g.suggestions.join(', ')}`)
+                    priority: employee.globalScore < 50 ? 'haute' : 'moyenne', icon: '🧬', title: 'Enrichir le vocabulaire ADN',
+                    actions: employee.adnMissingGroups.slice(0, 5).map(g => `Ajouter : "${g.suggestions.join('" ou "')}"`)
                 });
             }
             
-            // Métier Recommendations
+            // Métier
             if (employee.deptSectionDetails) {
                 employee.deptSectionDetails.forEach(section => {
-                    if (section.foundCount < section.totalCount / 2) {
+                    if (section.foundCount < section.totalCount / 3) {
                         const priority = section.weight === 3 ? 'haute' : (section.weight === 2 ? 'moyenne' : 'basse');
                         recommendations.metier.push({
-                            priority,
-                            icon: section.weight === 3 ? '🎯' : (section.weight === 2 ? '📈' : '📊'),
-                            title: `Compléter ${section.name}`,
-                            actions: section.missing.slice(0, 4).map(k => `Ajouter "${k}"`)
+                            priority, icon: section.weight === 3 ? '🎯' : (section.weight === 2 ? '👥' : '📊'),
+                            title: `Compléter ${section.name.replace('Section 1 - ', '').replace('Section 2 - ', '').replace('Section 3 - ', '')}`,
+                            actions: section.missing.slice(0, 5).map(k => `Ajouter "${k}"`)
                         });
                     }
                 });
@@ -1026,411 +824,24 @@
         }
 
         // ===== EXPORT PDF =====
-        async function exportToPDF(employee) {
-            const loadingDiv = document.createElement('div');
-            loadingDiv.id = 'pdf-loading';
-            loadingDiv.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
-            loadingDiv.innerHTML = '<div class="bg-white p-6 rounded-xl shadow-xl"><div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div><p class="text-cyrus-dark">Génération du PDF...</p></div>';
-            document.body.appendChild(loadingDiv);
+        function exportToPDF(employeeId) {
+            const emp = state.employees.find(e => e.id === employeeId);
+            if (!emp) return;
             
-            try {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF('p', 'mm', 'a4');
-                const pageWidth = 210;
-                const pageHeight = 297;
-                const margin = 15;
-                const contentWidth = pageWidth - 2 * margin;
-                
-                let y = margin;
-                
-                const colors = {
-                    cyrusDark: [0, 13, 48],
-                    cyrusGold: [196, 181, 134],
-                    cyrusLight: [241, 241, 241],
-                    green: [34, 197, 94],
-                    yellow: [234, 179, 8],
-                    orange: [249, 115, 22],
-                    red: [239, 68, 68],
-                    gray: [107, 114, 128],
-                    lightGray: [229, 231, 235],
-                    text: [0, 13, 48]
-                };
-                
-                const addNewPageIfNeeded = (neededHeight) => {
-                    if (y + neededHeight > pageHeight - margin) {
-                        doc.addPage();
-                        y = margin;
-                        return true;
-                    }
-                    return false;
-                };
-                
-                const drawProgressBar = (x, y, width, height, value, max, color) => {
-                    doc.setFillColor(...colors.lightGray);
-                    doc.roundedRect(x, y, width, height, 2, 2, 'F');
-                    const fillWidth = (value / max) * width;
-                    doc.setFillColor(...color);
-                    doc.roundedRect(x, y, fillWidth, height, 2, 2, 'F');
-                };
-                
-                const getScoreColor = (score) => {
-                    if (score >= 70) return colors.green;
-                    if (score >= 50) return colors.yellow;
-                    if (score >= 30) return colors.orange;
-                    return colors.red;
-                };
-                
-                // ===== EN-TÊTE =====
-                doc.setFillColor(...colors.cyrusDark);
-                doc.rect(0, 0, pageWidth, 35, 'F');
-                
-                doc.setFillColor(...colors.cyrusGold);
-                doc.rect(0, 32, pageWidth, 3, 'F');
-                
-                doc.setTextColor(255, 255, 255);
-                doc.setFontSize(18);
-                doc.setFont('helvetica', 'bold');
-                doc.text('CYRUS HEREZ', margin, 15);
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
-                doc.text('Analyse de Profil LinkedIn', margin, 22);
-                doc.setTextColor(...colors.cyrusGold);
-                doc.text(new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }), pageWidth - margin, 22, { align: 'right' });
-                
-                y = 45;
-                
-                // ===== INFOS PROFIL =====
-                doc.setTextColor(...colors.cyrusDark);
-                doc.setFontSize(16);
-                doc.setFont('helvetica', 'bold');
-                doc.text(`${employee.firstName} ${employee.lastName}`, margin, y);
-                
-                if (employee.linkedinIsNoGo) {
-                    doc.setFillColor(254, 226, 226);
-                    doc.roundedRect(margin + 80, y - 5, 25, 7, 2, 2, 'F');
-                    doc.setFontSize(8);
-                    doc.setTextColor(...colors.red);
-                    doc.text('NO-GO', margin + 83, y);
-                }
-                
-                y += 6;
-                doc.setFontSize(11);
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(...colors.gray);
-                doc.text(employee.position || 'Poste non renseigné', margin, y);
-                y += 5;
-                doc.text(`${employee.department} • ${employee.company || 'Cyrus Herez'}`, margin, y);
-                y += 10;
-                
-                // ===== SCORES GLOBAUX =====
-                doc.setFillColor(...colors.cyrusLight);
-                doc.roundedRect(margin, y, contentWidth, 25, 3, 3, 'F');
-                
-                doc.setTextColor(...colors.cyrusDark);
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'bold');
-                doc.text('Scores globaux', margin + 5, y + 6);
-                
-                const avgSSI = getAverageSSI();
-                const scores = [
-                    { label: 'SSI', value: employee.ssiScore || 0 },
-                    { label: 'LinkedIn Pro', value: employee.linkedinGlobalScore || 0 },
-                    { label: 'ADN', value: employee.globalScore || 0 },
-                    { label: 'Métier', value: employee.deptScore || 0 },
-                    { label: 'ATS', value: employee.atsScore || 0 }
-                ];
-                
-                const scoreWidth = contentWidth / 5;
-                scores.forEach((s, i) => {
-                    const x = margin + i * scoreWidth;
-                    doc.setFontSize(18);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(...getScoreColor(s.value));
-                    doc.text(`${s.value}`, x + scoreWidth/2, y + 16, { align: 'center' });
-                    doc.setFontSize(7);
-                    doc.setTextColor(...colors.gray);
-                    doc.text(`${s.label}`, x + scoreWidth/2, y + 21, { align: 'center' });
-                });
-                
-                y += 32;
-                
-                // ===== SSI SECTION =====
-                doc.setFillColor(245, 243, 255);
-                doc.roundedRect(margin, y, contentWidth, 60, 3, 3, 'F');
-                
-                doc.setFontSize(11);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...colors.cyrusDark);
-                doc.text('Social Selling Index (SSI)', margin + 5, y + 7);
-                
-                const ssiLevel = employee.ssiScore >= 75 ? 'Excellent' : employee.ssiScore >= 55 ? 'Bon' : employee.ssiScore >= 35 ? 'À développer' : 'Faible';
-                doc.setFontSize(9);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...getScoreColor(employee.ssiScore || 0));
-                doc.text(`${getScoreEmoji(employee.ssiScore || 0)} ${ssiLevel} ${employee.ssiScore || 0}/100`, margin + 5, y + 14);
-                
-                // Classements avec moyenne dynamique
-                doc.setFontSize(8);
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(...colors.gray);
-                const sectorRank = getSectorRanking(employee.ssiScore || 0);
-                doc.text(`Classement: Top ${sectorRank}%`, margin + 5, y + 20);
-                doc.text(`Moyenne équipe: ${avgSSI}`, margin + 70, y + 20);
-                
-                // URL Score
-                if (employee.ssiUrlScore !== undefined) {
-                    doc.setFontSize(7);
-                    doc.text(`URL LinkedIn: ${employee.ssiUrlScore}/${employee.ssiUrlMaxScore} pts`, margin + 120, y + 20);
-                }
-                
-                // Barres SSI
-                const ssiFactors = [
-                    { label: 'Marque professionnelle', value: employee.ssiBrandScore || 0, max: 25 },
-                    { label: 'Trouver les bonnes personnes', value: employee.ssiPeopleScore || 0, max: 25 },
-                    { label: 'Échanger des informations', value: employee.ssiEngagementScore || 0, max: 25 },
-                    { label: 'Établir des relations', value: employee.ssiRelationScore || 0, max: 25 }
-                ];
-                
-                let barY = y + 28;
-                ssiFactors.forEach((factor) => {
-                    doc.setFontSize(7);
-                    doc.setTextColor(...colors.cyrusDark);
-                    doc.text(factor.label, margin + 5, barY + 3);
-                    drawProgressBar(margin + 55, barY, 90, 5, factor.value, factor.max, getScoreColor((factor.value/factor.max)*100));
-                    doc.setFontSize(7);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(...getScoreColor((factor.value/factor.max)*100));
-                    doc.text(`${factor.value}/${factor.max}`, margin + 148, barY + 3);
-                    barY += 7;
-                });
-                
-                y += 65;
-                
-                // ===== LINKEDIN PRO =====
-                addNewPageIfNeeded(50);
-                
-                doc.setFillColor(236, 254, 255);
-                doc.roundedRect(margin, y, contentWidth, 50, 3, 3, 'F');
-                
-                doc.setFontSize(11);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...colors.cyrusDark);
-                doc.text('Évaluation LinkedIn Pro', margin + 5, y + 7);
-                
-                doc.setFontSize(9);
-                doc.setTextColor(...getScoreColor(employee.linkedinGlobalScore || 0));
-                doc.text(`${employee.linkedinGlobalScore || 0}/100`, margin + 5, y + 14);
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(...colors.cyrusDark);
-                doc.text(`${employee.linkedinLevel || ''} - ${employee.linkedinVerdict || ''}`, margin + 25, y + 14);
-                
-                if (employee.linkedinStrengths && employee.linkedinStrengths.length > 0) {
-                    doc.setFontSize(7);
-                    doc.setTextColor(...colors.green);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('Points forts : ', margin + 5, y + 22);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(employee.linkedinStrengths.map(s => s.label).join(', '), margin + 28, y + 22);
-                }
-                
-                if (employee.linkedinWeaknesses && employee.linkedinWeaknesses.length > 0) {
-                    doc.setFontSize(7);
-                    doc.setTextColor(...colors.orange);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('À améliorer : ', margin + 5, y + 28);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(employee.linkedinWeaknesses.map(s => s.label).join(', '), margin + 28, y + 28);
-                }
-                
-                // Barres LinkedIn
-                const linkedinFactors = [
-                    { label: 'Identité', value: employee.linkedinIdentityScore || 0, max: 15 },
-                    { label: 'Valeur', value: employee.linkedinPositioningScore || 0, max: 20 },
-                    { label: 'Expérience', value: employee.linkedinExperienceScore || 0, max: 25 },
-                    { label: 'Compétences', value: employee.linkedinCompetenceScore || 0, max: 20 },
-                    { label: 'Engagement', value: employee.linkedinEngagementScore || 0, max: 10 },
-                    { label: 'Formation', value: employee.linkedinFormationScore || 0, max: 10 }
-                ];
-                
-                const factorWidth = contentWidth / 6;
-                linkedinFactors.forEach((factor, i) => {
-                    const x = margin + i * factorWidth;
-                    doc.setFontSize(6);
-                    doc.setTextColor(...colors.gray);
-                    doc.text(factor.label, x + factorWidth/2, y + 38, { align: 'center' });
-                    drawProgressBar(x + 2, y + 40, factorWidth - 4, 3, factor.value, factor.max, getScoreColor((factor.value/factor.max)*100));
-                    doc.setFontSize(6);
-                    doc.setTextColor(...getScoreColor((factor.value/factor.max)*100));
-                    doc.text(`${factor.value}/${factor.max}`, x + factorWidth/2, y + 47, { align: 'center' });
-                });
-                
-                y += 55;
-                
-                // ===== ADN + MÉTIER =====
-                addNewPageIfNeeded(60);
-                
-                // ADN
-                doc.setFillColor(240, 253, 244);
-                doc.roundedRect(margin, y, contentWidth/2 - 2, 30, 3, 3, 'F');
-                
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...colors.cyrusDark);
-                doc.text('ADN Cyrus Herez', margin + 5, y + 7);
-                
-                doc.setFontSize(14);
-                doc.setTextColor(...getScoreColor(employee.globalScore || 0));
-                doc.text(`${employee.globalScore || 0}/100`, margin + 5, y + 16);
-                
-                doc.setFontSize(7);
-                doc.setTextColor(...colors.gray);
-                doc.text(`${employee.adnFoundGroups?.length || 0}/${employee.adnTotalGroups || 14} thématiques`, margin + 5, y + 22);
-                
-                // Métier
-                doc.setFillColor(238, 242, 255);
-                doc.roundedRect(margin + contentWidth/2 + 2, y, contentWidth/2 - 2, 30, 3, 3, 'F');
-                
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...colors.cyrusDark);
-                doc.text(`Métier - ${employee.department}`, margin + contentWidth/2 + 7, y + 7);
-                
-                doc.setFontSize(14);
-                doc.setTextColor(...getScoreColor(employee.deptScore || 0));
-                doc.text(`${employee.deptScore || 0}/100`, margin + contentWidth/2 + 7, y + 16);
-                
-                doc.setFontSize(7);
-                doc.setTextColor(...colors.gray);
-                doc.text(`${employee.deptFoundKeywords?.length || 0} mots-clés`, margin + contentWidth/2 + 7, y + 22);
-                
-                y += 35;
-                
-                // ===== PRÉCONISATIONS =====
-                const recommendations = generateRecommendations(employee);
-                const allRecs = [...recommendations.url, ...recommendations.ssi, ...recommendations.linkedin].filter(r => r.priority === 'haute' || r.priority === 'moyenne');
-                
-                if (allRecs.length > 0) {
-                    addNewPageIfNeeded(50);
-                    
-                    doc.setFillColor(255, 251, 235);
-                    const recHeight = Math.min(55, 15 + allRecs.length * 12);
-                    doc.roundedRect(margin, y, contentWidth, recHeight, 3, 3, 'F');
-                    
-                    doc.setFontSize(10);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(...colors.cyrusDark);
-                    doc.text('Plan d\'action - Préconisations', margin + 5, y + 7);
-                    
-                    let recY = y + 14;
-                    allRecs.slice(0, 4).forEach((rec) => {
-                        const priorityColor = rec.priority === 'haute' ? colors.red : colors.yellow;
-                        
-                        doc.setFontSize(7);
-                        doc.setFont('helvetica', 'bold');
-                        doc.setTextColor(...priorityColor);
-                        doc.text(`● ${rec.priority.toUpperCase()}`, margin + 5, recY);
-                        
-                        doc.setTextColor(...colors.cyrusDark);
-                        doc.text(`${rec.icon} ${rec.title}`, margin + 25, recY);
-                        
-                        if (rec.actions && rec.actions.length > 0) {
-                            doc.setFont('helvetica', 'normal');
-                            doc.setFontSize(6);
-                            doc.setTextColor(...colors.gray);
-                            doc.text('• ' + rec.actions[0], margin + 30, recY + 4);
-                        }
-                        
-                        recY += 11;
-                    });
-                }
-                
-                // Pied de page
-                doc.setFontSize(7);
-                doc.setTextColor(...colors.cyrusGold);
-                doc.text(`Généré le ${new Date().toLocaleString('fr-FR')} • Analyseur LinkedIn Cyrus Herez v5`, margin, pageHeight - 10);
-                
-                const filename = `profil-linkedin-${employee.firstName}-${employee.lastName}-${new Date().toISOString().slice(0,10)}.pdf`;
-                doc.save(filename);
-                
-            } catch (error) {
-                console.error('Erreur PDF:', error);
-                alert('Erreur lors de la génération du PDF');
-            } finally {
-                document.getElementById('pdf-loading')?.remove();
-            }
-        }
-
-        // ===== AJOUT RAPIDE =====
-        function quickAdd() {
-            const text = prompt('📋 Collez le contenu du profil LinkedIn ici (Ctrl+V / Cmd+V) :');
-            if (!text || text.length < 50) {
-                alert('❌ Le texte est vide ou trop court. Veuillez copier le profil complet depuis LinkedIn.');
-                return;
-            }
-            const rawLinkedinUrl = prompt('🔗 Collez l\'URL du profil LinkedIn (optionnel) :') || '';
-            let linkedinUrl = '';
-            if (rawLinkedinUrl.trim() !== '' && isValidLinkedInURL(rawLinkedinUrl.trim())) {
-                linkedinUrl = rawLinkedinUrl.trim();
-            }
-            
-            const extracted = extractProfileInfo(text);
-            let firstName = extracted.firstName || (linkedinUrl ? extractNameFromLinkedInUrl(linkedinUrl).firstName : '') || 'Prénom';
-            let lastName = extracted.lastName || (linkedinUrl ? extractNameFromLinkedInUrl(linkedinUrl).lastName : '') || 'Nom';
-            
-            let autoDept = '', maxScore = 0;
-            state.departments.forEach(dept => {
-                const deptAnalysis = calculateDeptScore(text, dept.name);
-                if (deptAnalysis.score > maxScore) { 
-                    maxScore = deptAnalysis.score; 
-                    autoDept = dept.name; 
-                }
-            });
-            
-            if (!autoDept) autoDept = state.departments[0].name;
-            
-            const deptAnalysis = calculateDeptScore(text, autoDept);
-            const adnAnalysis = analyzeADN(text);
-            
-            const newEmployee = {
-                id: Date.now(), 
-                firstName, lastName, 
-                position: extracted.position || 'Poste', 
-                department: autoDept,
-                company: extracted.company || state.targetCompany, 
-                linkedinUrl, email: '', profileText: text,
-                globalScore: adnAnalysis.globalScore, 
-                adnFoundGroups: adnAnalysis.foundGroups,
-                adnMissingGroups: adnAnalysis.missingGroups,
-                adnTotalGroups: adnAnalysis.totalGroups,
-                wordCount: adnAnalysis.wordCount,
-                analyzedAt: adnAnalysis.analyzedAt, 
-                deptScore: deptAnalysis.score, 
-                deptFoundKeywords: deptAnalysis.foundKeywords,
-                deptMissingKeywords: deptAnalysis.missingKeywords, 
-                deptTotalKeywords: deptAnalysis.totalKeywords,
-                deptSectionDetails: deptAnalysis.sectionDetails,
-                deptWeightedPoints: deptAnalysis.weightedPoints,
-                deptDetailedFound: deptAnalysis.detailedFound,
-                createdAt: new Date().toISOString()
-            };
-            
-            Object.assign(newEmployee, calculateLinkedInScore(text, newEmployee), calculateSSI(text, newEmployee));
-            Object.assign(newEmployee, calculateATSScore(text, newEmployee, autoDept));
-            
-            state.employees.push(newEmployee);
-            saveState();
+            state.selectedEmployee = emp;
+            state.currentView = 'print';
             render();
             
-            const linkedinInfo = newEmployee.linkedinIsNoGo ? ' ⛔ NO-GO' : ' ' + newEmployee.linkedinLevel;
-            alert('✅ Profil ajouté : ' + newEmployee.firstName + ' ' + newEmployee.lastName + 
-                '\n\n📊 Score SSI : ' + newEmployee.ssiScore + '/100' +
-                '\n🔗 Score URL : ' + newEmployee.ssiUrlScore + '/' + newEmployee.ssiUrlMaxScore +
-                '\n🔵 Score LinkedIn Pro : ' + newEmployee.linkedinGlobalScore + '/100' + linkedinInfo +
-                '\n🧬 Score ADN : ' + newEmployee.globalScore + '/100' +
-                '\n💼 Score Métier : ' + newEmployee.deptScore + '/100' +
-                '\n🎯 Score ATS : ' + newEmployee.atsScore + '/100');
+            setTimeout(() => {
+                window.print();
+                setTimeout(() => {
+                    state.currentView = 'detail';
+                    render();
+                }, 500);
+            }, 300);
         }
 
+        // ===== CRUD =====
         function deleteEmployee(id) {
             if (confirm('Supprimer ce collaborateur ?')) {
                 state.employees = state.employees.filter(emp => emp.id !== id);
@@ -1446,7 +857,7 @@
         }
 
         function exportData() {
-            const blob = new Blob([JSON.stringify({ employees: state.employees, adnKeywords: state.adnKeywords, departments: state.departments }, null, 2)], { type: 'application/json' });
+            const blob = new Blob([JSON.stringify({ employees: state.employees, departments: state.departments }, null, 2)], { type: 'application/json' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = 'linkedin-analyzer-cyrus-' + Date.now() + '.json';
@@ -1473,15 +884,59 @@
             return 'text-red-600';
         }
 
+        function handleAddEmployee(event) {
+            event.preventDefault();
+            const profileText = document.getElementById('profileText').value;
+            const linkedinUrl = document.getElementById('linkedinUrl')?.value || '';
+            const department = document.getElementById('department').value || state.departments[0].name;
+            
+            if (linkedinUrl && !isValidLinkedInURL(linkedinUrl)) { alert('⚠️ URL LinkedIn invalide'); return; }
+            
+            const adnAnalysis = analyzeADN(profileText);
+            const deptAnalysis = calculateDeptScore(profileText, department);
+            
+            const newEmployee = {
+                id: Date.now(), 
+                firstName: document.getElementById('firstName').value, 
+                lastName: document.getElementById('lastName').value,
+                position: document.getElementById('position').value, 
+                department, 
+                company: document.getElementById('company').value,
+                linkedinUrl, profileText, 
+                globalScore: adnAnalysis.globalScore, 
+                adnFoundGroups: adnAnalysis.foundGroups,
+                adnMissingGroups: adnAnalysis.missingGroups,
+                adnTotalGroups: adnAnalysis.totalGroups,
+                wordCount: adnAnalysis.wordCount,
+                deptScore: deptAnalysis.score,
+                deptFoundKeywords: deptAnalysis.foundKeywords, 
+                deptMissingKeywords: deptAnalysis.missingKeywords,
+                deptTotalKeywords: deptAnalysis.totalKeywords,
+                deptSectionDetails: deptAnalysis.sectionDetails,
+                deptWeightedPoints: deptAnalysis.weightedPoints,
+                deptDetailedFound: deptAnalysis.detailedFound,
+                createdAt: new Date().toISOString()
+            };
+            
+            Object.assign(newEmployee, calculateLinkedInScore(profileText, newEmployee), calculateSSI(profileText, newEmployee));
+            Object.assign(newEmployee, calculateATSScore(profileText, newEmployee, department));
+            
+            state.employees.push(newEmployee);
+            saveState();
+            state.currentView = 'list';
+            render();
+            alert('✅ Profil ajouté !');
+        }
+
         // ===== RENDU =====
 
         function renderHeader() {
-            return `<header class="bg-cyrus-dark shadow-lg">
+            return `<header class="bg-cyrus-dark shadow-lg no-print">
                 <div class="max-w-7xl mx-auto px-4 py-5">
                     <div class="flex items-center justify-between">
                         <div>
                             <h1 class="text-2xl font-bold text-white">🏛️ Analyseur LinkedIn</h1>
-                            <p class="text-sm mt-1" style="color: #c4b586;">Cyrus Herez • ADN de Marque • v5</p>
+                            <p class="text-sm mt-1" style="color: #c4b586;">Cyrus Herez • ADN de Marque • v6</p>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="exportData()" class="p-2 text-white hover:bg-white/10 rounded-lg transition" title="Exporter JSON">📥</button>
@@ -1519,14 +974,9 @@
                 </div>`;
             }
             
-            html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button onclick="quickAdd()" class="text-white py-5 rounded-xl shadow-lg transition transform hover:scale-[1.02]" style="background: linear-gradient(135deg, #000d30 0%, #001a4d 100%);">
-                    <div class="font-bold text-lg">⚡ Coller le texte</div>
-                    <div class="text-sm opacity-90 mt-1" style="color: #c4b586;">Copier-coller le profil LinkedIn</div>
-                </button>
-                <button onclick="state.currentView = 'add'; render();" class="bg-white border-2 text-cyrus-dark py-5 rounded-xl hover:bg-gray-50 transition" style="border-color: #c4b586;">
-                    <div class="font-bold text-lg">➕ Saisie manuelle</div>
-                    <div class="text-sm text-gray-500 mt-1">Formulaire complet</div>
+            html += `<div class="flex justify-center">
+                <button onclick="state.currentView = 'add'; render();" class="bg-white border-2 text-cyrus-dark py-4 px-8 rounded-xl hover:bg-gray-50 transition font-bold text-lg" style="border-color: #c4b586;">
+                    ➕ Ajouter un profil
                 </button>
             </div>`;
             
@@ -1541,9 +991,7 @@
                         <div class="flex-1">
                             <div class="flex items-center gap-2 flex-wrap mb-1">
                                 <h3 class="text-lg font-bold text-cyrus-dark">${emp.firstName} ${emp.lastName}</h3>
-                                ${linkedinNoGoBadge}
-                                ${cyrusHerezBadge}
-                                ${urlBadge}
+                                ${linkedinNoGoBadge} ${cyrusHerezBadge} ${urlBadge}
                             </div>
                             <p class="text-gray-600">${emp.position}</p>
                             <div class="flex gap-2 mt-2 text-sm">
@@ -1560,7 +1008,7 @@
                     </div>
                     <div class="flex gap-2 mt-4 pt-4 border-t border-gray-100">
                         <button onclick="viewEmployee(${emp.id})" class="flex-1 px-4 py-2.5 rounded-lg font-medium transition" style="background-color: rgba(196, 181, 134, 0.2); color: #000d30;">📊 Voir la fiche</button>
-                        <button onclick="exportToPDF(state.employees.find(e => e.id === ${emp.id}))" class="px-4 py-2.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium transition">📄 PDF</button>
+                        <button onclick="exportToPDF(${emp.id})" class="px-4 py-2.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium transition">📄 PDF</button>
                         ${emp.linkedinUrl && isValidLinkedInURL(emp.linkedinUrl) ? '<a href="' + emp.linkedinUrl + '" target="_blank" class="px-4 py-2.5 text-blue-600 hover:bg-blue-50 rounded-lg transition">🔗</a>' : ''}
                         <button onclick="deleteEmployee(${emp.id})" class="px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-lg transition">🗑️</button>
                     </div>
@@ -1590,16 +1038,12 @@
             
             let html = `<div id="profile-detail" class="space-y-6">
                 <div class="flex justify-between items-center no-print">
-                    <button onclick="state.currentView = 'list'; render();" class="text-cyrus-dark hover:opacity-70 font-medium flex items-center gap-2">
-                        <span>←</span> Retour à la liste
-                    </button>
-                    <button onclick="exportToPDF(state.selectedEmployee)" class="px-4 py-2 text-white rounded-lg font-medium transition flex items-center gap-2" style="background-color: #000d30;">
-                        📄 Exporter en PDF
-                    </button>
+                    <button onclick="state.currentView = 'list'; render();" class="text-cyrus-dark hover:opacity-70 font-medium flex items-center gap-2">← Retour</button>
+                    <button onclick="exportToPDF(${emp.id})" class="px-4 py-2 text-white rounded-lg font-medium" style="background-color: #000d30;">📄 Exporter PDF</button>
                 </div>
                 
-                <!-- En-tête profil -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border" style="border-color: #c4b586;">
+                <!-- En-tête -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border print-avoid-break" style="border-color: #c4b586;">
                     <div class="flex items-start justify-between mb-4">
                         <div>
                             <div class="flex items-center gap-3 mb-2 flex-wrap">
@@ -1611,52 +1055,24 @@
                             <p class="text-gray-500">${emp.department} • ${emp.company}</p>
                         </div>
                     </div>
-                    ${emp.linkedinUrl ? '<a href="' + emp.linkedinUrl + '" target="_blank" class="inline-flex items-center gap-2 hover:underline text-sm px-4 py-2 rounded-full" style="background-color: rgba(196, 181, 134, 0.2); color: #000d30;">🔗 Voir le profil LinkedIn</a>' : ''}
+                    ${emp.linkedinUrl ? '<a href="' + emp.linkedinUrl + '" target="_blank" class="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-full no-print" style="background-color: rgba(196, 181, 134, 0.2); color: #000d30;">🔗 Voir LinkedIn</a>' : ''}
                 </div>
                 
                 <!-- Scores globaux -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 print-avoid-break">
                     <h3 class="text-lg font-bold mb-4 text-cyrus-dark">🏆 Scores globaux</h3>
                     <div class="grid grid-cols-5 gap-4">
-                        <div class="text-center p-4 rounded-xl" style="background-color: rgba(139, 92, 246, 0.1);">
-                            <p class="text-sm font-medium mb-2" style="color: #7c3aed;">📊 SSI</p>
-                            <span class="text-3xl font-bold ${getScoreColor(emp.ssiScore || 0)}">${emp.ssiScore || 0}</span>
-                            <span class="text-gray-500">/100</span>
-                        </div>
-                        <div class="text-center p-4 rounded-xl" style="background-color: rgba(6, 182, 212, 0.1);">
-                            <p class="text-sm font-medium mb-2" style="color: #0891b2;">🔵 LinkedIn Pro</p>
-                            <span class="text-3xl font-bold ${getScoreColor(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}</span>
-                            <span class="text-gray-500">/100</span>
-                            <p class="text-xs mt-1 ${emp.linkedinIsNoGo ? 'text-red-600 font-bold' : 'text-gray-500'}">${emp.linkedinLevel || ''}</p>
-                        </div>
-                        <div class="text-center p-4 rounded-xl" style="background-color: rgba(34, 197, 94, 0.1);">
-                            <p class="text-sm font-medium mb-2" style="color: #16a34a;">🧬 ADN</p>
-                            <span class="text-3xl font-bold ${getScoreColor(emp.globalScore || 0)}">${emp.globalScore || 0}</span>
-                            <span class="text-gray-500">/100</span>
-                        </div>
-                        <div class="text-center p-4 rounded-xl" style="background-color: rgba(99, 102, 241, 0.1);">
-                            <p class="text-sm font-medium mb-2" style="color: #4f46e5;">💼 Métier</p>
-                            <span class="text-3xl font-bold ${getScoreColor(emp.deptScore || 0)}">${emp.deptScore || 0}</span>
-                            <span class="text-gray-500">/100</span>
-                        </div>
-                        <div class="text-center p-4 rounded-xl" style="background-color: rgba(245, 158, 11, 0.1);">
-                            <p class="text-sm font-medium mb-2" style="color: #d97706;">🎯 ATS</p>
-                            <span class="text-3xl font-bold ${getScoreColor(emp.atsScore || 0)}">${emp.atsScore || 0}</span>
-                            <span class="text-gray-500">/100</span>
-                            <p class="text-xs mt-1">${emp.atsDecision || ''}</p>
-                        </div>
+                        <div class="text-center p-4 rounded-xl" style="background-color: rgba(139, 92, 246, 0.1);"><p class="text-sm font-medium mb-2" style="color: #7c3aed;">📊 SSI</p><span class="text-3xl font-bold ${getScoreColor(emp.ssiScore || 0)}">${emp.ssiScore || 0}</span><span class="text-gray-500">/100</span></div>
+                        <div class="text-center p-4 rounded-xl" style="background-color: rgba(6, 182, 212, 0.1);"><p class="text-sm font-medium mb-2" style="color: #0891b2;">🔵 LinkedIn</p><span class="text-3xl font-bold ${getScoreColor(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}</span><span class="text-gray-500">/100</span></div>
+                        <div class="text-center p-4 rounded-xl" style="background-color: rgba(34, 197, 94, 0.1);"><p class="text-sm font-medium mb-2" style="color: #16a34a;">🧬 ADN</p><span class="text-3xl font-bold ${getScoreColor(emp.globalScore || 0)}">${emp.globalScore || 0}</span><span class="text-gray-500">/100</span></div>
+                        <div class="text-center p-4 rounded-xl" style="background-color: rgba(99, 102, 241, 0.1);"><p class="text-sm font-medium mb-2" style="color: #4f46e5;">💼 Métier</p><span class="text-3xl font-bold ${getScoreColor(emp.deptScore || 0)}">${emp.deptScore || 0}</span><span class="text-gray-500">/100</span></div>
+                        <div class="text-center p-4 rounded-xl" style="background-color: rgba(245, 158, 11, 0.1);"><p class="text-sm font-medium mb-2" style="color: #d97706;">🎯 ATS</p><span class="text-3xl font-bold ${getScoreColor(emp.atsScore || 0)}">${emp.atsScore || 0}</span><span class="text-gray-500">/100</span></div>
                     </div>
                 </div>`;
             
-            // ===== SSI Section =====
+            // SSI Section
             const ssiLevel = emp.ssiScore >= 75 ? '🏆 Excellent' : emp.ssiScore >= 55 ? '✅ Bon' : emp.ssiScore >= 35 ? '⚠️ À développer' : '🔴 Faible';
-            const ssiDescription = emp.ssiScore >= 75 ? 
-                `${emp.firstName} fait partie des meilleurs profils du secteur avec un SSI de ${emp.ssiScore}/100. Son personal branding est solide et son activité LinkedIn génère de l'engagement.` :
-                emp.ssiScore >= 55 ? 
-                `${emp.firstName} a un bon niveau d'activité sur LinkedIn avec un SSI de ${emp.ssiScore}/100.` :
-                `${emp.firstName} a un SSI de ${emp.ssiScore}/100, inférieur à la moyenne de l'équipe (${avgSSI}).`;
-            
-            html += `<div class="p-6 rounded-xl border" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%); border-color: rgba(139, 92, 246, 0.3);">
+            html += `<div class="p-6 rounded-xl border print-avoid-break" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%); border-color: rgba(139, 92, 246, 0.3);">
                 <h3 class="text-lg font-bold mb-4 text-cyrus-dark">📊 Social Selling Index (SSI)</h3>
                 
                 <div class="bg-white p-4 rounded-lg mb-4 border-l-4 ${emp.ssiScore >= 55 ? 'border-green-500' : emp.ssiScore >= 35 ? 'border-yellow-500' : 'border-red-500'}">
@@ -1664,8 +1080,7 @@
                         <span class="font-bold text-lg text-cyrus-dark">${ssiLevel}</span>
                         <span class="text-2xl font-bold ${getScoreColor(emp.ssiScore || 0)}">${emp.ssiScore || 0}/100</span>
                     </div>
-                    <p class="text-gray-600 text-sm">${ssiDescription}</p>
-                    <div class="flex flex-wrap gap-2 mt-3">
+                    <div class="flex flex-wrap gap-2 mt-2">
                         <span class="text-xs font-medium text-green-700">Points forts :</span>
                         ${(emp.ssiStrengths || []).map(s => `<span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">${s.icon} ${s.label}</span>`).join('')}
                     </div>
@@ -1675,308 +1090,202 @@
                     </div>` : ''}
                 </div>
                 
-                <!-- Classements avec moyenne dynamique -->
                 <div class="grid grid-cols-3 gap-4 mb-4">
-                    <div class="bg-white p-4 rounded-lg text-center">
-                        <p class="text-xs text-gray-500 mb-1">Classement Équipe</p>
-                        <p class="text-2xl font-bold text-green-600">Top ${sectorRank}%</p>
-                        <p class="text-xs text-gray-400">Sur ${state.employees.length} profils</p>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg text-center">
-                        <p class="text-xs text-gray-500 mb-1">Moyenne Équipe</p>
-                        <p class="text-2xl font-bold" style="color: #c4b586;">${avgSSI}</p>
-                        <p class="text-xs text-gray-400">SSI moyen des profils</p>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg text-center">
-                        <p class="text-xs text-gray-500 mb-1">Score URL LinkedIn</p>
-                        <p class="text-2xl font-bold ${emp.ssiUrlScore >= 7 ? 'text-green-600' : emp.ssiUrlScore >= 4 ? 'text-yellow-600' : 'text-red-600'}">${emp.ssiUrlScore || 0}/${emp.ssiUrlMaxScore || 10}</p>
-                        <p class="text-xs text-gray-400">${emp.ssiUrlUsername || 'Non renseigné'}</p>
-                    </div>
+                    <div class="bg-white p-4 rounded-lg text-center"><p class="text-xs text-gray-500 mb-1">Classement</p><p class="text-2xl font-bold text-green-600">Top ${sectorRank}%</p></div>
+                    <div class="bg-white p-4 rounded-lg text-center"><p class="text-xs text-gray-500 mb-1">Moyenne équipe</p><p class="text-2xl font-bold" style="color: #c4b586;">${avgSSI}</p></div>
+                    <div class="bg-white p-4 rounded-lg text-center"><p class="text-xs text-gray-500 mb-1">Score URL</p><p class="text-2xl font-bold ${emp.ssiUrlScore >= 7 ? 'text-green-600' : emp.ssiUrlScore >= 4 ? 'text-yellow-600' : 'text-red-600'}">${emp.ssiUrlScore || 0}/${emp.ssiUrlMaxScore || 10}</p></div>
                 </div>
                 
-                <!-- Détails URL -->
-                ${emp.ssiUrlDetails && emp.ssiUrlDetails.length > 0 || emp.ssiUrlIssues && emp.ssiUrlIssues.length > 0 ? `
-                <div class="bg-white p-3 rounded-lg mb-4">
-                    <p class="text-sm font-medium text-cyrus-dark mb-2">🔗 Analyse URL LinkedIn</p>
-                    ${emp.ssiUrlDetails && emp.ssiUrlDetails.length > 0 ? `<div class="flex flex-wrap gap-1 mb-1">${emp.ssiUrlDetails.map(d => `<span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">${d}</span>`).join('')}</div>` : ''}
-                    ${emp.ssiUrlIssues && emp.ssiUrlIssues.length > 0 ? `<div class="flex flex-wrap gap-1">${emp.ssiUrlIssues.map(i => `<span class="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded">✗ ${i}</span>`).join('')}</div>` : ''}
+                ${emp.ssiUrlDetails?.length > 0 || emp.ssiUrlIssues?.length > 0 ? `<div class="bg-white p-3 rounded-lg mb-4">
+                    <p class="text-sm font-medium text-cyrus-dark mb-2">🔗 Analyse URL</p>
+                    ${emp.ssiUrlDetails?.length > 0 ? `<div class="flex flex-wrap gap-1 mb-1">${emp.ssiUrlDetails.map(d => `<span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">✓ ${d}</span>`).join('')}</div>` : ''}
+                    ${emp.ssiUrlIssues?.length > 0 ? `<div class="flex flex-wrap gap-1">${emp.ssiUrlIssues.map(i => `<span class="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded">✗ ${i}</span>`).join('')}</div>` : ''}
                 </div>` : ''}
                 
-                <!-- Barres de progression SSI -->
                 <div class="bg-white p-4 rounded-lg mb-4">
                     <h4 class="font-medium text-cyrus-dark mb-3">Les quatre facteurs SSI</h4>
-                    <div class="space-y-4">
-                        <div>
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="text-sm text-gray-600">🏆 Marque professionnelle</span>
-                                <span class="text-sm font-bold ${getScoreColor((emp.ssiBrandScore/25)*100)}">${emp.ssiBrandScore || 0}/25</span>
-                            </div>
-                            <div class="progress-bar bg-gray-200">
-                                <div class="progress-fill ${getProgressGradient((emp.ssiBrandScore/25)*100)}" style="width: ${((emp.ssiBrandScore || 0)/25)*100}%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="text-sm text-gray-600">👥 Trouver les bonnes personnes</span>
-                                <span class="text-sm font-bold ${getScoreColor((emp.ssiPeopleScore/25)*100)}">${emp.ssiPeopleScore || 0}/25</span>
-                            </div>
-                            <div class="progress-bar bg-gray-200">
-                                <div class="progress-fill ${getProgressGradient((emp.ssiPeopleScore/25)*100)}" style="width: ${((emp.ssiPeopleScore || 0)/25)*100}%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="text-sm text-gray-600">💬 Échanger des informations</span>
-                                <span class="text-sm font-bold ${getScoreColor((emp.ssiEngagementScore/25)*100)}">${emp.ssiEngagementScore || 0}/25</span>
-                            </div>
-                            <div class="progress-bar bg-gray-200">
-                                <div class="progress-fill ${getProgressGradient((emp.ssiEngagementScore/25)*100)}" style="width: ${((emp.ssiEngagementScore || 0)/25)*100}%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="text-sm text-gray-600">🤝 Établir des relations</span>
-                                <span class="text-sm font-bold ${getScoreColor((emp.ssiRelationScore/25)*100)}">${emp.ssiRelationScore || 0}/25</span>
-                            </div>
-                            <div class="progress-bar bg-gray-200">
-                                <div class="progress-fill ${getProgressGradient((emp.ssiRelationScore/25)*100)}" style="width: ${((emp.ssiRelationScore || 0)/25)*100}%"></div>
-                            </div>
-                        </div>
+                    <div class="space-y-3">
+                        <div><div class="flex justify-between mb-1"><span class="text-sm text-gray-600">🏆 Marque professionnelle</span><span class="text-sm font-bold ${getScoreColor((emp.ssiBrandScore/25)*100)}">${emp.ssiBrandScore || 0}/25</span></div><div class="progress-bar bg-gray-200"><div class="progress-fill ${getProgressGradient((emp.ssiBrandScore/25)*100)}" style="width: ${((emp.ssiBrandScore || 0)/25)*100}%"></div></div></div>
+                        <div><div class="flex justify-between mb-1"><span class="text-sm text-gray-600">👥 Trouver les bonnes personnes</span><span class="text-sm font-bold ${getScoreColor((emp.ssiPeopleScore/25)*100)}">${emp.ssiPeopleScore || 0}/25</span></div><div class="progress-bar bg-gray-200"><div class="progress-fill ${getProgressGradient((emp.ssiPeopleScore/25)*100)}" style="width: ${((emp.ssiPeopleScore || 0)/25)*100}%"></div></div></div>
+                        <div><div class="flex justify-between mb-1"><span class="text-sm text-gray-600">💬 Échanger des informations</span><span class="text-sm font-bold ${getScoreColor((emp.ssiEngagementScore/25)*100)}">${emp.ssiEngagementScore || 0}/25</span></div><div class="progress-bar bg-gray-200"><div class="progress-fill ${getProgressGradient((emp.ssiEngagementScore/25)*100)}" style="width: ${((emp.ssiEngagementScore || 0)/25)*100}%"></div></div></div>
+                        <div><div class="flex justify-between mb-1"><span class="text-sm text-gray-600">🤝 Établir des relations</span><span class="text-sm font-bold ${getScoreColor((emp.ssiRelationScore/25)*100)}">${emp.ssiRelationScore || 0}/25</span></div><div class="progress-bar bg-gray-200"><div class="progress-fill ${getProgressGradient((emp.ssiRelationScore/25)*100)}" style="width: ${((emp.ssiRelationScore || 0)/25)*100}%"></div></div></div>
                     </div>
                 </div>
                 
-                <!-- Plan d'action SSI -->
-                ${recommendations.ssi.length > 0 || recommendations.url.length > 0 ? `
-                <div class="p-4 rounded-lg border" style="background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3);">
+                ${[...recommendations.url, ...recommendations.ssi].length > 0 ? `<div class="p-4 rounded-lg border" style="background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3);">
                     <h4 class="font-medium text-cyrus-dark mb-3">📋 Plan d'action SSI</h4>
-                    ${[...recommendations.url, ...recommendations.ssi].map(rec => `
-                        <div class="mb-3">
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="px-2 py-0.5 rounded text-xs font-bold ${rec.priority === 'haute' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">● Priorité ${rec.priority}</span>
-                                <span class="font-medium text-cyrus-dark">${rec.icon} ${rec.title}</span>
-                            </div>
-                            <ul class="text-sm text-gray-600 ml-6 list-disc">
-                                ${rec.actions.map(a => `<li>${a}</li>`).join('')}
-                            </ul>
+                    ${[...recommendations.url, ...recommendations.ssi].map(rec => `<div class="mb-3">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="px-2 py-0.5 rounded text-xs font-bold ${rec.priority === 'haute' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">● ${rec.priority}</span>
+                            <span class="font-medium text-cyrus-dark">${rec.icon} ${rec.title}</span>
                         </div>
-                    `).join('')}
+                        <ul class="text-sm text-gray-600 ml-6 list-disc">${rec.actions.map(a => `<li>${a}</li>`).join('')}</ul>
+                    </div>`).join('')}
                 </div>` : ''}
             </div>`;
             
-            // ===== LinkedIn Pro Section =====
-            const linkedinDescription = emp.linkedinGlobalScore >= 85 ?
-                `Le profil de ${emp.firstName} est exemplaire : positionnement clair, expériences détaillées avec résultats, crédibilité établie.` :
-                emp.linkedinGlobalScore >= 70 ?
-                `${emp.firstName} a un profil solide et exploitable. Quelques optimisations pourraient le rendre encore plus percutant.` :
-                `Le profil de ${emp.firstName} nécessite des améliorations pour être pleinement efficace.`;
-            
-            html += `<div class="p-6 rounded-xl border" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%); border-color: rgba(6, 182, 212, 0.3);">
+            // LinkedIn Pro Section
+            html += `<div class="p-6 rounded-xl border print-avoid-break" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%); border-color: rgba(6, 182, 212, 0.3);">
                 <h3 class="text-lg font-bold mb-4 text-cyrus-dark">🔵 Évaluation LinkedIn Pro</h3>
                 
                 <div class="bg-white p-4 rounded-lg mb-4 border-l-4 ${emp.linkedinGlobalScore >= 70 ? 'border-green-500' : emp.linkedinGlobalScore >= 50 ? 'border-yellow-500' : 'border-red-500'}">
                     <div class="flex items-center gap-2 mb-2">
                         <span class="text-2xl font-bold ${getScoreColor(emp.linkedinGlobalScore || 0)}">${emp.linkedinGlobalScore || 0}/100</span>
-                        <span class="px-2 py-0.5 rounded text-sm font-medium ${emp.linkedinGlobalScore >= 85 ? 'bg-green-100 text-green-700' : emp.linkedinGlobalScore >= 70 ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}">${emp.linkedinLevel}</span>
-                        <span class="text-gray-600">${emp.linkedinVerdict}</span>
+                        <span class="px-2 py-0.5 rounded text-sm font-medium ${emp.linkedinGlobalScore >= 85 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${emp.linkedinLevel}</span>
                     </div>
-                    <p class="text-gray-600 text-sm mb-3">${linkedinDescription}</p>
-                    
                     <div class="flex flex-wrap gap-1 mt-2">
-                        <span class="text-xs font-medium text-gray-500">✅ Points forts :</span>
+                        <span class="text-xs font-medium text-green-700">✅ Points forts :</span>
                         ${(emp.linkedinStrengths || []).map(s => `<span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">${s.icon} ${s.label}</span>`).join('')}
                     </div>
-                    ${(emp.linkedinWeaknesses || []).length > 0 ? `
-                    <div class="flex flex-wrap gap-1 mt-2">
-                        <span class="text-xs font-medium text-gray-500">⚠️ À améliorer :</span>
+                    ${(emp.linkedinWeaknesses || []).length > 0 ? `<div class="flex flex-wrap gap-1 mt-2">
+                        <span class="text-xs font-medium text-orange-700">⚠️ À améliorer :</span>
                         ${emp.linkedinWeaknesses.map(s => `<span class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">${s.icon} ${s.label}</span>`).join('')}
                     </div>` : ''}
                 </div>
                 
-                <!-- Barres LinkedIn Pro -->
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div class="bg-white p-4 rounded-lg">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-sm text-gray-600">🆔 Identité & Crédibilité</span>
-                            <span class="text-sm font-bold ${getScoreColor((emp.linkedinIdentityScore/15)*100)}">${emp.linkedinIdentityScore || 0}/15</span>
-                        </div>
-                        <div class="progress-bar bg-gray-200">
-                            <div class="progress-fill ${getProgressGradient((emp.linkedinIdentityScore/15)*100)}" style="width: ${((emp.linkedinIdentityScore || 0)/15)*100}%"></div>
-                        </div>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-sm text-gray-600">🎯 Proposition de valeur</span>
-                            <span class="text-sm font-bold ${getScoreColor((emp.linkedinPositioningScore/20)*100)}">${emp.linkedinPositioningScore || 0}/20</span>
-                        </div>
-                        <div class="progress-bar bg-gray-200">
-                            <div class="progress-fill ${getProgressGradient((emp.linkedinPositioningScore/20)*100)}" style="width: ${((emp.linkedinPositioningScore || 0)/20)*100}%"></div>
-                        </div>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-sm text-gray-600">💼 Expérience professionnelle</span>
-                            <span class="text-sm font-bold ${getScoreColor((emp.linkedinExperienceScore/25)*100)}">${emp.linkedinExperienceScore || 0}/25</span>
-                        </div>
-                        <div class="progress-bar bg-gray-200">
-                            <div class="progress-fill ${getProgressGradient((emp.linkedinExperienceScore/25)*100)}" style="width: ${((emp.linkedinExperienceScore || 0)/25)*100}%"></div>
-                        </div>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-sm text-gray-600">⭐ Compétences & Expertise</span>
-                            <span class="text-sm font-bold ${getScoreColor((emp.linkedinCompetenceScore/20)*100)}">${emp.linkedinCompetenceScore || 0}/20</span>
-                        </div>
-                        <div class="progress-bar bg-gray-200">
-                            <div class="progress-fill ${getProgressGradient((emp.linkedinCompetenceScore/20)*100)}" style="width: ${((emp.linkedinCompetenceScore || 0)/20)*100}%"></div>
-                        </div>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-sm text-gray-600">📢 Engagement & Visibilité</span>
-                            <span class="text-sm font-bold ${getScoreColor((emp.linkedinEngagementScore/10)*100)}">${emp.linkedinEngagementScore || 0}/10</span>
-                        </div>
-                        <div class="progress-bar bg-gray-200">
-                            <div class="progress-fill ${getProgressGradient((emp.linkedinEngagementScore/10)*100)}" style="width: ${((emp.linkedinEngagementScore || 0)/10)*100}%"></div>
-                        </div>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-sm text-gray-600">🎓 Formation & Académique</span>
-                            <span class="text-sm font-bold ${getScoreColor((emp.linkedinFormationScore/10)*100)}">${emp.linkedinFormationScore || 0}/10</span>
-                        </div>
-                        <div class="progress-bar bg-gray-200">
-                            <div class="progress-fill ${getProgressGradient((emp.linkedinFormationScore/10)*100)}" style="width: ${((emp.linkedinFormationScore || 0)/10)*100}%"></div>
-                        </div>
-                    </div>
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div class="bg-white p-4 rounded-lg"><div class="flex justify-between mb-1"><span class="text-sm text-gray-600">🆔 Identité</span><span class="text-sm font-bold ${getScoreColor((emp.linkedinIdentityScore/15)*100)}">${emp.linkedinIdentityScore || 0}/15</span></div><div class="progress-bar bg-gray-200"><div class="progress-fill ${getProgressGradient((emp.linkedinIdentityScore/15)*100)}" style="width: ${((emp.linkedinIdentityScore || 0)/15)*100}%"></div></div></div>
+                    <div class="bg-white p-4 rounded-lg"><div class="flex justify-between mb-1"><span class="text-sm text-gray-600">🎯 Valeur</span><span class="text-sm font-bold ${getScoreColor((emp.linkedinPositioningScore/20)*100)}">${emp.linkedinPositioningScore || 0}/20</span></div><div class="progress-bar bg-gray-200"><div class="progress-fill ${getProgressGradient((emp.linkedinPositioningScore/20)*100)}" style="width: ${((emp.linkedinPositioningScore || 0)/20)*100}%"></div></div></div>
+                    <div class="bg-white p-4 rounded-lg"><div class="flex justify-between mb-1"><span class="text-sm text-gray-600">💼 Expérience</span><span class="text-sm font-bold ${getScoreColor((emp.linkedinExperienceScore/25)*100)}">${emp.linkedinExperienceScore || 0}/25</span></div><div class="progress-bar bg-gray-200"><div class="progress-fill ${getProgressGradient((emp.linkedinExperienceScore/25)*100)}" style="width: ${((emp.linkedinExperienceScore || 0)/25)*100}%"></div></div></div>
+                    <div class="bg-white p-4 rounded-lg"><div class="flex justify-between mb-1"><span class="text-sm text-gray-600">⭐ Compétences</span><span class="text-sm font-bold ${getScoreColor((emp.linkedinCompetenceScore/20)*100)}">${emp.linkedinCompetenceScore || 0}/20</span></div><div class="progress-bar bg-gray-200"><div class="progress-fill ${getProgressGradient((emp.linkedinCompetenceScore/20)*100)}" style="width: ${((emp.linkedinCompetenceScore || 0)/20)*100}%"></div></div></div>
+                    <div class="bg-white p-4 rounded-lg"><div class="flex justify-between mb-1"><span class="text-sm text-gray-600">📢 Engagement</span><span class="text-sm font-bold ${getScoreColor((emp.linkedinEngagementScore/10)*100)}">${emp.linkedinEngagementScore || 0}/10</span></div><div class="progress-bar bg-gray-200"><div class="progress-fill ${getProgressGradient((emp.linkedinEngagementScore/10)*100)}" style="width: ${((emp.linkedinEngagementScore || 0)/10)*100}%"></div></div></div>
+                    <div class="bg-white p-4 rounded-lg"><div class="flex justify-between mb-1"><span class="text-sm text-gray-600">🎓 Formation</span><span class="text-sm font-bold ${getScoreColor((emp.linkedinFormationScore/10)*100)}">${emp.linkedinFormationScore || 0}/10</span></div><div class="progress-bar bg-gray-200"><div class="progress-fill ${getProgressGradient((emp.linkedinFormationScore/10)*100)}" style="width: ${((emp.linkedinFormationScore || 0)/10)*100}%"></div></div></div>
                 </div>
                 
-                ${recommendations.linkedin.length > 0 ? `
-                <div class="p-4 rounded-lg border" style="background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3);">
-                    <h4 class="font-medium text-cyrus-dark mb-3">📋 Préconisations LinkedIn Pro</h4>
-                    ${recommendations.linkedin.map(rec => `
-                        <div class="mb-3">
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="px-2 py-0.5 rounded text-xs font-bold ${rec.priority === 'haute' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">● Priorité ${rec.priority}</span>
-                                <span class="font-medium text-cyrus-dark">${rec.icon} ${rec.title}</span>
-                            </div>
-                            <ul class="text-sm text-gray-600 ml-6 list-disc">
-                                ${rec.tips ? rec.tips.map(t => `<li>${t}</li>`).join('') : rec.actions.map(a => `<li>${a}</li>`).join('')}
-                            </ul>
+                ${recommendations.linkedin.length > 0 ? `<div class="p-4 rounded-lg border" style="background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3);">
+                    <h4 class="font-medium text-cyrus-dark mb-3">📋 Préconisations LinkedIn</h4>
+                    ${recommendations.linkedin.map(rec => `<div class="mb-3">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="px-2 py-0.5 rounded text-xs font-bold ${rec.priority === 'haute' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">● ${rec.priority}</span>
+                            <span class="font-medium text-cyrus-dark">${rec.icon} ${rec.title}</span>
                         </div>
-                    `).join('')}
+                        <ul class="text-sm text-gray-600 ml-6 list-disc">${rec.actions.map(a => `<li>${a}</li>`).join('')}</ul>
+                    </div>`).join('')}
                 </div>` : ''}
             </div>`;
             
-            // ===== ADN + Métier Sections =====
-            html += `<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- ADN -->
-                <div class="p-6 rounded-xl border" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%); border-color: rgba(34, 197, 94, 0.3);">
-                    <h3 class="text-lg font-bold mb-4 text-cyrus-dark">🧬 ADN Cyrus Herez</h3>
-                    <div class="bg-white p-4 rounded-lg mb-4 border-l-4 ${emp.globalScore >= 50 ? 'border-green-500' : 'border-orange-500'}">
-                        <span class="text-2xl font-bold ${getScoreColor(emp.globalScore || 0)}">${emp.globalScore || 0}/100</span>
-                        <span class="text-gray-600 ml-2">${emp.adnFoundGroups?.length || 0}/${emp.adnTotalGroups || 14} thématiques</span>
-                    </div>
-                    ${emp.adnFoundGroups && emp.adnFoundGroups.length > 0 ? '<div class="mb-3"><p class="text-sm font-medium text-green-700 mb-2">✓ Présentes :</p><div class="flex flex-wrap gap-1">' + emp.adnFoundGroups.map(g => '<span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">' + g.name + '</span>').join('') + '</div></div>' : ''}
-                    ${emp.adnMissingGroups && emp.adnMissingGroups.length > 0 ? '<div><p class="text-sm font-medium text-orange-700 mb-2">✗ Manquantes :</p><div class="flex flex-wrap gap-1">' + emp.adnMissingGroups.map(g => '<span class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">' + g.name + '</span>').join('') + '</div></div>' : ''}
+            // ADN Section
+            html += `<div class="p-6 rounded-xl border print-avoid-break" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%); border-color: rgba(34, 197, 94, 0.3);">
+                <h3 class="text-lg font-bold mb-4 text-cyrus-dark">🧬 ADN Cyrus Herez</h3>
+                <div class="bg-white p-4 rounded-lg mb-4 border-l-4 ${emp.globalScore >= 50 ? 'border-green-500' : 'border-orange-500'}">
+                    <span class="text-2xl font-bold ${getScoreColor(emp.globalScore || 0)}">${emp.globalScore || 0}/100</span>
+                    <span class="text-gray-600 ml-2">${emp.adnFoundGroups?.length || 0}/${emp.adnTotalGroups || 14} thématiques</span>
                 </div>
+                ${emp.adnFoundGroups?.length > 0 ? `<div class="mb-3"><p class="text-sm font-medium text-green-700 mb-2">✓ Présentes :</p><div class="flex flex-wrap gap-1">${emp.adnFoundGroups.map(g => `<span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">${g.name}</span>`).join('')}</div></div>` : ''}
+                ${emp.adnMissingGroups?.length > 0 ? `<div class="mb-3"><p class="text-sm font-medium text-orange-700 mb-2">✗ Manquantes :</p><div class="flex flex-wrap gap-1">${emp.adnMissingGroups.map(g => `<span class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">${g.name}</span>`).join('')}</div></div>` : ''}
+                ${recommendations.adn.length > 0 ? `<div class="p-4 rounded-lg border mt-4" style="background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3);">
+                    <h4 class="font-medium text-cyrus-dark mb-2">📋 Préconisations ADN</h4>
+                    <ul class="text-sm text-gray-600 list-disc ml-4">${recommendations.adn[0].actions.map(a => `<li>${a}</li>`).join('')}</ul>
+                </div>` : ''}
+            </div>`;
+            
+            // SCORE MÉTIER DÉVELOPPÉ
+            html += `<div class="p-6 rounded-xl border print-avoid-break" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%); border-color: rgba(99, 102, 241, 0.3);">
+                <h3 class="text-lg font-bold mb-4 text-cyrus-dark">💼 Score Métier - ${emp.department}</h3>
                 
-                <!-- Métier -->
-                <div class="p-6 rounded-xl border" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%); border-color: rgba(99, 102, 241, 0.3);">
-                    <h3 class="text-lg font-bold mb-4 text-cyrus-dark">💼 Score Métier - ${emp.department}</h3>
-                    <div class="bg-white p-4 rounded-lg mb-4">
-                        <span class="text-2xl font-bold ${getScoreColor(emp.deptScore || 0)}">${emp.deptScore || 0}/100</span>
-                        <span class="text-gray-600 ml-2">${emp.deptFoundKeywords?.length || 0} mots-clés</span>
+                <div class="bg-white p-4 rounded-lg mb-4 border-l-4 ${emp.deptScore >= 50 ? 'border-green-500' : 'border-orange-500'}">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-3xl font-bold ${getScoreColor(emp.deptScore || 0)}">${emp.deptScore || 0}/100</span>
+                            <p class="text-gray-600 text-sm mt-1">${emp.deptFoundKeywords?.length || 0} mots-clés trouvés • ${emp.deptWeightedPoints || 0} points pondérés</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500">Objectif</p>
+                            <p class="font-bold text-cyrus-dark">${emp.deptTargetPoints || 60} pts</p>
+                        </div>
                     </div>
-                    ${emp.deptSectionDetails ? emp.deptSectionDetails.map(section => {
-                        const sectionColor = section.weight === 3 ? 'green' : (section.weight === 2 ? 'yellow' : 'gray');
-                        return `<div class="bg-white p-3 rounded-lg mb-2">
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-xs font-bold px-2 py-0.5 bg-${sectionColor}-100 text-${sectionColor}-700 rounded">x${section.weight}</span>
-                                <span class="text-sm text-gray-600">${section.name.replace('Section 1 - ', '').replace('Section 2 - ', '').replace('Section 3 - ', '')}</span>
-                                <span class="text-sm font-bold ${getScoreColor((section.foundCount/section.totalCount)*100)}">${section.foundCount}/${section.totalCount}</span>
+                </div>`;
+            
+            // Détail par section
+            if (emp.deptSectionDetails) {
+                emp.deptSectionDetails.forEach(section => {
+                    const sectionBg = section.weight === 3 ? 'rgba(34, 197, 94, 0.1)' : (section.weight === 2 ? 'rgba(234, 179, 8, 0.1)' : 'rgba(156, 163, 175, 0.1)');
+                    const sectionBorder = section.weight === 3 ? 'border-green-400' : (section.weight === 2 ? 'border-yellow-400' : 'border-gray-400');
+                    const sectionTextColor = section.weight === 3 ? 'text-green-700' : (section.weight === 2 ? 'text-yellow-700' : 'text-gray-700');
+                    
+                    html += `<div class="bg-white p-4 rounded-lg mb-4 border-l-4 ${sectionBorder}">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-1 rounded text-xs font-bold ${section.weight === 3 ? 'bg-green-100 text-green-700' : (section.weight === 2 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700')}">Coef. x${section.weight}</span>
+                                <span class="font-bold text-cyrus-dark">${section.name}</span>
                             </div>
-                            <div class="progress-bar bg-gray-200" style="height: 6px;">
-                                <div class="progress-fill ${getProgressGradient((section.foundCount/section.totalCount)*100)}" style="width: ${(section.foundCount/section.totalCount)*100}%; height: 100%;"></div>
+                            <div class="text-right">
+                                <span class="text-lg font-bold ${getScoreColor((section.foundCount/section.totalCount)*100)}">${section.foundCount}/${section.totalCount}</span>
+                                <p class="text-xs text-gray-500">${section.points} pts / ${section.maxPoints} max</p>
                             </div>
-                        </div>`;
-                    }).join('') : ''}
-                </div>
+                        </div>
+                        
+                        <div class="progress-bar bg-gray-200 mb-3">
+                            <div class="progress-fill ${getProgressGradient((section.foundCount/section.totalCount)*100)}" style="width: ${(section.foundCount/section.totalCount)*100}%"></div>
+                        </div>
+                        
+                        ${section.found.length > 0 ? `<div class="mb-2">
+                            <p class="text-xs font-medium text-green-700 mb-1">✓ Mots-clés trouvés (${section.found.length})</p>
+                            <div class="flex flex-wrap gap-1">${section.found.map(k => `<span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">${k}</span>`).join('')}</div>
+                        </div>` : ''}
+                        
+                        ${section.missing.length > 0 ? `<div>
+                            <p class="text-xs font-medium text-orange-700 mb-1">✗ Mots-clés manquants (${section.missing.length})</p>
+                            <div class="flex flex-wrap gap-1">${section.missing.slice(0, 10).map(k => `<span class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">${k}</span>`).join('')}${section.missing.length > 10 ? `<span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">+${section.missing.length - 10} autres</span>` : ''}</div>
+                        </div>` : ''}
+                    </div>`;
+                });
+            }
+            
+            // Préconisations Métier
+            if (recommendations.metier.length > 0) {
+                html += `<div class="p-4 rounded-lg border" style="background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3);">
+                    <h4 class="font-medium text-cyrus-dark mb-3">📋 Préconisations Métier</h4>
+                    ${recommendations.metier.map(rec => `<div class="mb-3">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="px-2 py-0.5 rounded text-xs font-bold ${rec.priority === 'haute' ? 'bg-red-100 text-red-700' : rec.priority === 'moyenne' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}">● ${rec.priority}</span>
+                            <span class="font-medium text-cyrus-dark">${rec.icon} ${rec.title}</span>
+                        </div>
+                        <ul class="text-sm text-gray-600 ml-6 list-disc">${rec.actions.map(a => `<li>${a}</li>`).join('')}</ul>
+                    </div>`).join('')}
+                </div>`;
+            }
+            
+            html += '</div>';
+            
+            // Footer pour impression
+            html += `<div class="text-center text-xs text-gray-500 mt-8 print-avoid-break">
+                <p>Généré le ${new Date().toLocaleString('fr-FR')} • Analyseur LinkedIn Cyrus Herez v6</p>
             </div>`;
             
             html += '</div>';
             return html;
         }
 
+        function renderPrintView() {
+            // Version optimisée pour l'impression (identique à detail mais sans no-print)
+            return renderEmployeeDetail().replace(/no-print/g, 'hidden');
+        }
+
         function renderAddForm() {
             let deptOptions = '<option value="">Sélectionner...</option>';
-            state.departments.forEach(d => {
-                deptOptions += `<option value="${d.name}">${d.name}</option>`;
-            });
+            state.departments.forEach(d => { deptOptions += `<option value="${d.name}">${d.name}</option>`; });
             
             return `<div class="bg-white p-8 rounded-xl shadow-sm max-w-3xl mx-auto border" style="border-color: #c4b586;">
-                <h2 class="text-2xl font-bold mb-6 text-cyrus-dark">➕ Ajouter un collaborateur</h2>
+                <h2 class="text-2xl font-bold mb-6 text-cyrus-dark">➕ Ajouter un profil LinkedIn</h2>
                 <form onsubmit="handleAddEmployee(event); return false;" class="space-y-5">
                     <div class="grid grid-cols-2 gap-4">
-                        <div><label class="block text-sm font-medium text-cyrus-dark mb-2">Prénom *</label><input type="text" id="firstName" required class="w-full px-4 py-3 border rounded-lg focus:ring-2" style="border-color: #c4b586;" /></div>
-                        <div><label class="block text-sm font-medium text-cyrus-dark mb-2">Nom *</label><input type="text" id="lastName" required class="w-full px-4 py-3 border rounded-lg focus:ring-2" style="border-color: #c4b586;" /></div>
+                        <div><label class="block text-sm font-medium text-cyrus-dark mb-2">Prénom *</label><input type="text" id="firstName" required class="w-full px-4 py-3 border rounded-lg" style="border-color: #c4b586;" /></div>
+                        <div><label class="block text-sm font-medium text-cyrus-dark mb-2">Nom *</label><input type="text" id="lastName" required class="w-full px-4 py-3 border rounded-lg" style="border-color: #c4b586;" /></div>
                     </div>
-                    <div><label class="block text-sm font-medium text-cyrus-dark mb-2">Poste</label><input type="text" id="position" class="w-full px-4 py-3 border rounded-lg" style="border-color: #c4b586;" /></div>
+                    <div><label class="block text-sm font-medium text-cyrus-dark mb-2">Poste</label><input type="text" id="position" class="w-full px-4 py-3 border rounded-lg" style="border-color: #c4b586;" placeholder="Ex: Conseiller en Gestion de Patrimoine" /></div>
                     <div class="grid grid-cols-2 gap-4">
                         <div><label class="block text-sm font-medium text-cyrus-dark mb-2">Service</label><select id="department" class="w-full px-4 py-3 border rounded-lg" style="border-color: #c4b586;">${deptOptions}</select></div>
                         <div><label class="block text-sm font-medium text-cyrus-dark mb-2">Entreprise</label><input type="text" id="company" value="${state.targetCompany}" class="w-full px-4 py-3 border rounded-lg" style="border-color: #c4b586;" /></div>
                     </div>
-                    <div><label class="block text-sm font-medium text-cyrus-dark mb-2">🔗 URL LinkedIn</label><input type="url" id="linkedinUrl" class="w-full px-4 py-3 border rounded-lg" style="border-color: #c4b586;" /></div>
-                    <div><label class="block text-sm font-medium text-cyrus-dark mb-2">Profil LinkedIn (texte) *</label><textarea id="profileText" required class="w-full px-4 py-3 border rounded-lg h-48" style="border-color: #c4b586;" placeholder="Collez le contenu du profil LinkedIn..."></textarea></div>
+                    <div><label class="block text-sm font-medium text-cyrus-dark mb-2">🔗 URL LinkedIn</label><input type="url" id="linkedinUrl" class="w-full px-4 py-3 border rounded-lg" style="border-color: #c4b586;" placeholder="https://www.linkedin.com/in/prenom-nom" /></div>
+                    <div><label class="block text-sm font-medium text-cyrus-dark mb-2">📋 Contenu du profil LinkedIn *</label><textarea id="profileText" required class="w-full px-4 py-3 border rounded-lg h-48" style="border-color: #c4b586;" placeholder="Collez ici le contenu complet du profil LinkedIn (résumé, expériences, compétences...)"></textarea><p class="text-xs text-gray-500 mt-1">Copiez le texte directement depuis la page LinkedIn du profil</p></div>
                     <div class="flex gap-3 pt-4">
-                        <button type="submit" class="flex-1 text-white py-4 rounded-lg font-medium" style="background-color: #000d30;">✅ Ajouter</button>
-                        <button type="button" onclick="state.currentView = 'list'; render();" class="flex-1 py-4 rounded-lg font-medium" style="background-color: #c4b586; color: #000d30;">❌ Annuler</button>
+                        <button type="submit" class="flex-1 text-white py-4 rounded-lg font-medium text-lg" style="background-color: #000d30;">✅ Analyser le profil</button>
+                        <button type="button" onclick="state.currentView = 'list'; render();" class="flex-1 py-4 rounded-lg font-medium text-lg" style="background-color: #c4b586; color: #000d30;">❌ Annuler</button>
                     </div>
                 </form>
             </div>`;
-        }
-
-        function handleAddEmployee(event) {
-            event.preventDefault();
-            const profileText = document.getElementById('profileText').value;
-            const linkedinUrl = document.getElementById('linkedinUrl')?.value || '';
-            const department = document.getElementById('department').value || state.departments[0].name;
-            
-            if (linkedinUrl && !isValidLinkedInURL(linkedinUrl)) { alert('⚠️ URL LinkedIn invalide'); return; }
-            
-            const adnAnalysis = analyzeADN(profileText);
-            const deptAnalysis = calculateDeptScore(profileText, department);
-            
-            const newEmployee = {
-                id: Date.now(), 
-                firstName: document.getElementById('firstName').value, 
-                lastName: document.getElementById('lastName').value,
-                position: document.getElementById('position').value, 
-                department, 
-                company: document.getElementById('company').value,
-                linkedinUrl, profileText, 
-                globalScore: adnAnalysis.globalScore, 
-                adnFoundGroups: adnAnalysis.foundGroups,
-                adnMissingGroups: adnAnalysis.missingGroups,
-                adnTotalGroups: adnAnalysis.totalGroups,
-                wordCount: adnAnalysis.wordCount,
-                analyzedAt: adnAnalysis.analyzedAt, 
-                deptScore: deptAnalysis.score,
-                deptFoundKeywords: deptAnalysis.foundKeywords, 
-                deptMissingKeywords: deptAnalysis.missingKeywords,
-                deptTotalKeywords: deptAnalysis.totalKeywords,
-                deptSectionDetails: deptAnalysis.sectionDetails,
-                deptWeightedPoints: deptAnalysis.weightedPoints,
-                createdAt: new Date().toISOString()
-            };
-            
-            Object.assign(newEmployee, calculateLinkedInScore(profileText, newEmployee), calculateSSI(profileText, newEmployee));
-            Object.assign(newEmployee, calculateATSScore(profileText, newEmployee, department));
-            
-            state.employees.push(newEmployee);
-            saveState();
-            state.currentView = 'list';
-            render();
-            alert('✅ Profil ajouté !');
         }
 
         function render() {
@@ -1985,7 +1294,9 @@
             if (state.currentView === 'list') content = renderEmployeeList();
             else if (state.currentView === 'detail') content = renderEmployeeDetail();
             else if (state.currentView === 'add') content = renderAddForm();
-            app.innerHTML = renderHeader() + '<main class="max-w-7xl mx-auto px-4 py-6">' + content + '</main>';
+            else if (state.currentView === 'print') content = renderPrintView();
+            
+            app.innerHTML = (state.currentView === 'print' ? '' : renderHeader()) + '<main class="max-w-7xl mx-auto px-4 py-6">' + content + '</main>';
         }
 
         loadState();
