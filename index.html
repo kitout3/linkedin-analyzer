@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -257,8 +258,6 @@ function formatDateTime(iso){
 
 /* =========================
    MOYENNES SSI
-   - Nationale = moyenne de tous les profils
-   - Ville = moyenne des profils de la même ville
 ========================= */
 function getAverageSSI(){
     if(state.employees.length === 0) return 0;
@@ -340,16 +339,26 @@ function analyzeLinkedInURL(url, firstName, lastName, position){
 }
 
 /* =========================
-   SSI
+   SSI (MAJ : bannière + malus marque "Cyrus Conseil / Maison Herez")
 ========================= */
 function calculateSSI(profileText, employee){
     const text = (profileText || "").toLowerCase();
     const words = processText(profileText);
     const wordCount = words.length;
 
+    // Détection mentions non conformes (dans titre/résumé/exp => inclus dans profileText)
+    const normalizedAll = normalizeText(profileText || "");
+    const forbiddenBrands = ["cyrus conseil", "maison herez"];
+    const foundForbiddenBrands = forbiddenBrands.filter(b => normalizedAll.includes(normalizeText(b)));
+    const hasForbiddenBrand = foundForbiddenBrands.length > 0;
+
     let brandScore = 0;
     if(employee.firstName && employee.lastName) brandScore += 5;
     if(employee.position) brandScore += 5;
+
+    // ✅ Bannière déclarée dans le formulaire
+    if(employee.hasBanner) brandScore += 5;
+
     if(wordCount >= 200) brandScore += 10;
     else if(wordCount >= 100) brandScore += 5;
     if(text.includes("expert") || text.includes("spécialiste") || text.includes("passion")) brandScore += 5;
@@ -366,13 +375,27 @@ function calculateSSI(profileText, employee){
     const foundRelationKeywords = relationKeywords.filter(k => text.includes(k));
     const relationScore = Math.min(25, foundRelationKeywords.length * 3);
 
-    const ssiScore = Math.round(brandScore + peopleScore + engagementScore + relationScore);
+    // ✅ Malus SSI si marque non conforme détectée
+    let ssiPenalty = 0;
+    let ssiPenaltyReasons = [];
+    if(hasForbiddenBrand){
+        ssiPenalty = 12; // Ajustable
+        ssiPenaltyReasons.push(`Mention(s) non conforme(s) détectée(s) : ${foundForbiddenBrands.join(", ")}`);
+    }
+
+    let ssiScore = Math.round(brandScore + peopleScore + engagementScore + relationScore);
+    ssiScore = Math.max(0, ssiScore - ssiPenalty);
 
     const ssiStrengths = [];
     const ssiWeaknesses = [];
 
     if(brandScore >= 20) ssiStrengths.push({ label:"Marque professionnelle" });
     else ssiWeaknesses.push({ label:"Marque professionnelle", priority: brandScore < 10 ? "haute":"moyenne" });
+
+    // ✅ Remonter l’absence de bannière comme axe
+    if(!employee.hasBanner){
+        ssiWeaknesses.push({ label:"Bannière (arrière-plan) absente", priority:"moyenne" });
+    }
 
     if(peopleScore >= 15) ssiStrengths.push({ label:"Trouver les bonnes personnes" });
     else ssiWeaknesses.push({ label:"Trouver les bonnes personnes", priority: peopleScore < 8 ? "haute":"moyenne" });
@@ -383,6 +406,10 @@ function calculateSSI(profileText, employee){
     if(relationScore >= 15) ssiStrengths.push({ label:"Établir des relations" });
     else ssiWeaknesses.push({ label:"Établir des relations", priority: relationScore < 8 ? "haute":"moyenne" });
 
+    if(hasForbiddenBrand){
+        ssiWeaknesses.push({ label:"Mention non conforme (Cyrus Conseil / Maison Herez)", priority:"haute" });
+    }
+
     const urlAnalysis = analyzeLinkedInURL(employee.linkedinUrl, employee.firstName, employee.lastName, employee.position);
 
     return {
@@ -392,11 +419,19 @@ function calculateSSI(profileText, employee){
         ssiEngagementScore: Math.round(engagementScore),
         ssiRelationScore: Math.round(relationScore),
         ssiStrengths, ssiWeaknesses,
+
         ssiUrlScore: urlAnalysis.score,
         ssiUrlMaxScore: urlAnalysis.maxScore,
         ssiUrlDetails: urlAnalysis.details,
         ssiUrlIssues: urlAnalysis.issues,
-        ssiUrlUsername: urlAnalysis.username
+        ssiUrlUsername: urlAnalysis.username,
+
+        // ✅ Exposition pour l’UI + préconisations
+        ssiHasBanner: !!employee.hasBanner,
+        ssiHasForbiddenBrand: hasForbiddenBrand,
+        ssiForbiddenBrands: foundForbiddenBrands,
+        ssiPenalty,
+        ssiPenaltyReasons
     };
 }
 
@@ -697,10 +732,23 @@ function calculateDeptScore(profileText, deptName){
 }
 
 /* =========================
-   RECOMMANDATIONS (sans icônes)
+   RECOMMANDATIONS (MAJ : non-conformité marque)
 ========================= */
 function generateRecommendations(employee){
     const recommendations = { ssi:[], linkedin:[], adn:[], metier:[], url:[] };
+
+    // ✅ Non-conformité : Cyrus Conseil / Maison Herez -> prioritaire SSI
+    if(employee.ssiHasForbiddenBrand){
+        recommendations.ssi.unshift({
+            priority:"haute",
+            title:"Non-conformité de marque détectée",
+            actions:[
+                `Supprimer toute mention de : ${employee.ssiForbiddenBrands.join(", ")}`,
+                `Remplacer par l’appellation cible : "${state.targetCompany}"`,
+                "Contrôler cohérence dans le titre, le résumé et les expériences"
+            ]
+        });
+    }
 
     if(employee.ssiUrlIssues && employee.ssiUrlIssues.length > 0){
         recommendations.url.push({
@@ -839,15 +887,14 @@ function clearAllData(){
 }
 
 /* =========================
-   AJOUT / MODIFICATION
-   - Ajout du champ Ville (obligatoire)
-   - Ajout updatedAt lors d'une modification
+   AJOUT / MODIFICATION (MAJ : champ hasBanner)
 ========================= */
 function buildEmployeeFromForm(mode, existing){
     const profileText = document.getElementById("profileText").value;
     const linkedinUrl = document.getElementById("linkedinUrl")?.value || "";
     const department = document.getElementById("department").value || state.departments[0].name;
     const city = document.getElementById("city").value || "";
+    const hasBanner = !!document.getElementById("hasBanner")?.checked; // ✅ NEW
 
     if(linkedinUrl && !isValidLinkedInURL(linkedinUrl)){
         alert("URL LinkedIn invalide");
@@ -875,6 +922,8 @@ function buildEmployeeFromForm(mode, existing){
         city,
         linkedinUrl,
         profileText,
+
+        hasBanner, // ✅ NEW
 
         globalScore: adnAnalysis.globalScore,
         adnFoundGroups: adnAnalysis.foundGroups,
@@ -964,12 +1013,20 @@ function renderEmployeeCard(emp){
         ? `<span class="text-xs px-2 py-0.5 rounded ${emp.ssiUrlScore >= 7 ? "bg-green-100 text-green-700" : emp.ssiUrlScore >= 4 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}">URL ${emp.ssiUrlScore}/${emp.ssiUrlMaxScore}</span>`
         : "";
 
+    const brandIssueBadge = emp.ssiHasForbiddenBrand
+        ? `<span class="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">Marque non conforme</span>`
+        : "";
+
+    const bannerBadge = (emp.ssiHasBanner !== undefined)
+        ? `<span class="text-xs px-2 py-0.5 rounded ${emp.ssiHasBanner ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}">Bannière ${emp.ssiHasBanner ? "OK" : "Non"}</span>`
+        : "";
+
     return `<div class="bg-white p-5 rounded-xl shadow-sm hover:shadow-md transition-all border ${emp.linkedinIsNoGo ? "border-l-4 border-l-red-500" : "border-gray-200"}">
         <div class="flex items-start justify-between gap-4">
             <div class="flex-1">
                 <div class="flex items-center gap-2 flex-wrap mb-1">
                     <h3 class="text-lg font-bold text-cyrus-dark">${emp.firstName} ${emp.lastName}</h3>
-                    ${noGoBadge} ${cyrusBadge} ${urlBadge}
+                    ${noGoBadge} ${cyrusBadge} ${urlBadge} ${bannerBadge} ${brandIssueBadge}
                 </div>
                 <p class="text-gray-600">${emp.position || "-"}</p>
                 <p class="text-gray-500 text-sm mt-1">${emp.department || "-"} • ${emp.company || "-"} • ${emp.city || "-"}</p>
@@ -1023,7 +1080,6 @@ function renderEmployeeList(){
         </button>
     </div>`;
 
-    // Accordéons par ville
     const cityOrder = [...state.cities];
     const employeesByCity = {};
     state.employees.forEach(e => {
@@ -1032,9 +1088,7 @@ function renderEmployeeList(){
         employeesByCity[c].push(e);
     });
 
-    // On n'affiche que les villes ayant des profils, mais dans l'ordre défini
     const citiesToRender = cityOrder.filter(c => employeesByCity[c]?.length);
-    // si jamais des profils ont une ville hors liste
     Object.keys(employeesByCity).forEach(c => {
         if(!cityOrder.includes(c) && c !== "Non renseignée") citiesToRender.push(c);
     });
@@ -1082,8 +1136,8 @@ function renderEmployeeDetail(){
     if(!emp) return "";
 
     const recommendations = generateRecommendations(emp);
-    const avgSSIglobal = getAverageSSI();                 // SSI globale (nationale)
-    const avgSSIcity = getAverageSSIByCity(emp.city);     // SSI ville
+    const avgSSIglobal = getAverageSSI();
+    const avgSSIcity = getAverageSSIByCity(emp.city);
     const sectorRank = getSectorRanking(emp.ssiScore || 0);
     const updatedDisplay = formatDateTime(emp.updatedAt || emp.createdAt);
     const createdDisplay = formatDateTime(emp.createdAt);
@@ -1106,6 +1160,7 @@ function renderEmployeeDetail(){
                         ${emp.linkedinHasCyrusHerez
                             ? `<span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">Cyrus Herez OK</span>`
                             : `<span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">Cyrus Herez absent</span>`}
+                        ${emp.ssiHasForbiddenBrand ? `<span class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium">Marque non conforme</span>` : ""}
                     </div>
                     <p class="text-lg text-gray-600">${emp.position || "-"}</p>
                     <p class="text-gray-500">${emp.department || "-"} • ${emp.company || "-"} • ${emp.city || "-"}</p>
@@ -1154,6 +1209,11 @@ function renderEmployeeDetail(){
     html += `<div class="p-6 rounded-xl border print-avoid-break" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%); border-color: rgba(139, 92, 246, 0.3);">
         <h3 class="text-lg font-bold mb-4 text-cyrus-dark">Social Selling Index (SSI)</h3>
 
+        ${(emp.ssiPenalty || 0) > 0 ? `<div class="bg-red-50 border border-red-200 p-3 rounded-lg mb-4">
+            <p class="text-sm font-bold text-red-700">Pénalité SSI : -${emp.ssiPenalty} pts</p>
+            <p class="text-sm text-red-700">${(emp.ssiPenaltyReasons || []).join(" • ")}</p>
+        </div>` : ""}
+
         <div class="bg-white p-4 rounded-lg mb-4 border-l-4 ${emp.ssiScore >= 55 ? "border-green-500" : emp.ssiScore >= 35 ? "border-yellow-500" : "border-red-500"}">
             <div class="flex items-center gap-3 mb-2 flex-wrap">
                 <span class="font-bold text-lg text-cyrus-dark">${ssiLevel}</span>
@@ -1169,7 +1229,7 @@ function renderEmployeeDetail(){
             </div>` : ""}
         </div>
 
-        <div class="grid grid-cols-4 gap-4 mb-4">
+        <div class="grid grid-cols-5 gap-4 mb-4">
             <div class="bg-white p-4 rounded-lg text-center">
                 <p class="text-xs text-gray-500 mb-1">Classement interne</p>
                 <p class="text-2xl font-bold text-green-600">Top ${sectorRank}%</p>
@@ -1187,6 +1247,10 @@ function renderEmployeeDetail(){
             <div class="bg-white p-4 rounded-lg text-center">
                 <p class="text-xs text-gray-500 mb-1">Score URL</p>
                 <p class="text-2xl font-bold ${emp.ssiUrlScore >= 7 ? "text-green-600" : emp.ssiUrlScore >= 4 ? "text-yellow-600" : "text-red-600"}">${emp.ssiUrlScore || 0}/${emp.ssiUrlMaxScore || 10}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg text-center">
+                <p class="text-xs text-gray-500 mb-1">Bannière</p>
+                <p class="text-2xl font-bold ${emp.ssiHasBanner ? "text-green-600" : "text-gray-600"}">${emp.ssiHasBanner ? "Oui" : "Non"}</p>
             </div>
         </div>
 
@@ -1231,7 +1295,7 @@ function renderEmployeeDetail(){
         </div>` : ""}
     </div>`;
 
-    // LinkedIn Pro (rendu compact, sans emojis)
+    // LinkedIn Pro
     html += `<div class="p-6 rounded-xl border print-avoid-break" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%); border-color: rgba(6, 182, 212, 0.3);">
         <h3 class="text-lg font-bold mb-4 text-cyrus-dark">Évaluation LinkedIn Pro</h3>
 
@@ -1289,7 +1353,7 @@ function renderEmployeeDetail(){
         </div>` : ""}
     </div>`;
 
-    // Métier (conservé)
+    // Métier
     html += `<div class="p-6 rounded-xl border print-avoid-break" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%); border-color: rgba(99, 102, 241, 0.3);">
         <h3 class="text-lg font-bold mb-4 text-cyrus-dark">Score Métier - ${emp.department}</h3>
 
@@ -1433,6 +1497,14 @@ function renderForm(mode){
                     <label class="block text-sm font-medium text-cyrus-dark mb-2">URL LinkedIn</label>
                     <input type="url" id="linkedinUrl" class="w-full px-4 py-3 border rounded-lg" style="border-color:#c4b586;" placeholder="https://www.linkedin.com/in/prenom-nom" value="${emp?.linkedinUrl || ""}" />
                 </div>
+            </div>
+
+            <!-- ✅ NEW : checkbox bannière -->
+            <div class="flex items-center gap-3 p-4 rounded-lg border" style="border-color:#c4b586;">
+                <input type="checkbox" id="hasBanner" class="h-4 w-4" ${emp?.hasBanner ? "checked" : ""} />
+                <label for="hasBanner" class="text-sm font-medium text-cyrus-dark">
+                    Bannière (photo arrière-plan) présente
+                </label>
             </div>
 
             <div>
